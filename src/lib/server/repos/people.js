@@ -133,6 +133,27 @@ export function getHousehold(db, userId) {
 }
 
 /**
+ * Household for any person in the household, including a spouse or child.
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} personId
+ */
+export function getHouseholdForPerson(db, personId) {
+	const user = db
+		.prepare(
+			`SELECT u.id
+			 FROM users u
+			 WHERE u.person_id = ?
+			 UNION
+			SELECT hm.user_id
+			 FROM household_memberships hm
+			 WHERE hm.person_id = ? AND hm.ended_at IS NULL
+			 LIMIT 1`
+		)
+		.get(personId, personId);
+	return user ? getHousehold(db, user.id) : null;
+}
+
+/**
  * @param {import('better-sqlite3').Database} db
  * @param {number} userId
  */

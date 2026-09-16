@@ -1,14 +1,15 @@
 import { error, fail } from '@sveltejs/kit';
 import { RELATIONSHIPS } from '$lib/constants.js';
 import { ageOn } from '$lib/dates.js';
+import { plainDate, today } from '$lib/dates.js';
 import { recordAudit, summarizeChange } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
-import { insertKnowledge, listKnowledge, retireKnowledge } from '$lib/server/repos/knowledge.js';
+import { correctKnowledge, getKnowledgeById, insertKnowledge, listKnowledge, retireKnowledge } from '$lib/server/repos/knowledge.js';
 import {
 	addHouseholdMember,
 	endHouseholdMembership,
-	getHousehold,
+	getHouseholdForPerson,
 	getPersonById,
 	listHouseholdHeads,
 	setPersonStatus,
@@ -22,11 +23,12 @@ export function load({ locals, params }) {
 	const person = getPersonById(locals.db, Number(params.id));
 	if (!person) error(404, 'Person not found.');
 	const userRow = locals.db.prepare('SELECT * FROM users WHERE person_id = ?').get(person.id);
-	const household = userRow ? getHousehold(locals.db, userRow.id) : null;
+	const household = getHouseholdForPerson(locals.db, person.id);
 	return {
 		csrf: locals.csrf,
 		person,
 		age: ageOn(person.birth_date),
+		today: today().toString(),
 		userRow,
 		household,
 		knowledge: listKnowledge(locals.db, person.id, { includeRetired: true }),
@@ -134,10 +136,13 @@ export const actions = {
 		const csrf = csrfError(form, locals);
 		if (csrf) return fail(403, { error: csrf });
 		const body = asString(form.get('body'));
+		const effectiveDate = asString(form.get('effectiveDate'));
 		if (!body) return fail(400, { error: 'Knowledge text is required.' });
+		try { plainDate(effectiveDate); } catch { return fail(400, { error: 'A valid date is required.' }); }
 		const id = insertKnowledge(locals.db, {
 			personId: Number(params.id),
 			body,
+			effectiveDate,
 			authorUserId: admin.id
 		});
 		recordAudit(locals.db, {
@@ -165,6 +170,50 @@ export const actions = {
 			entityType: 'knowledge',
 			entityId: id,
 			summary: 'Retired knowledge entry'
+		});
+		return { saved: true };
+	},
+
+	editKnowledge: async ({ request, locals, params }) => {
+		const admin = requireAdmin(locals);
+		const form = await request.formData();
+		const csrf = csrfError(form, locals);
+		if (csrf) return fail(403, { error: csrf });
+		const id = Number(asString(form.get('knowledgeId')));
+		const body = asString(form.get('body'));
+		const effectiveDate = asString(form.get('effectiveDate'));
+		const entry = getKnowledgeById(locals.db, id);
+		if (!entry || entry.person_id !== Number(params.id)) return fail(404, { error: 'Knowledge entry not found.' });
+		if (!body) return fail(400, { error: 'Knowledge text is required.' });
+		try { plainDate(effectiveDate); } catch { return fail(400, { error: 'A valid date is required.' }); }
+		correctKnowledge(locals.db, id, body, effectiveDate);
+		recordAudit(locals.db, {
+			actorUserId: admin.id,
+			actorEmail: locals.person?.email,
+			action: 'knowledge_update',
+			entityType: 'knowledge',
+			entityId: id,
+			summary: `Updated knowledge for person ${params.id}`
+		});
+		return { saved: true };
+	},
+
+	deleteKnowledge: async ({ request, locals, params }) => {
+		const admin = requireAdmin(locals);
+		const form = await request.formData();
+		const csrf = csrfError(form, locals);
+		if (csrf) return fail(403, { error: csrf });
+		const id = Number(asString(form.get('knowledgeId')));
+		const entry = getKnowledgeById(locals.db, id);
+		if (!entry || entry.person_id !== Number(params.id)) return fail(404, { error: 'Knowledge entry not found.' });
+		retireKnowledge(locals.db, id);
+		recordAudit(locals.db, {
+			actorUserId: admin.id,
+			actorEmail: locals.person?.email,
+			action: 'knowledge_retire',
+			entityType: 'knowledge',
+			entityId: id,
+			summary: `Retired knowledge for person ${params.id}`
 		});
 		return { saved: true };
 	}

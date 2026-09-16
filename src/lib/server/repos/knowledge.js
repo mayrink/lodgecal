@@ -76,6 +76,10 @@ export function retireKnowledge(db, id) {
  * @param {number} id
  * @param {string} body
  */
-export function correctKnowledge(db, id, body) {
-	db.prepare('UPDATE knowledge_entries SET body = ? WHERE id = ?').run(body, id);
+export function correctKnowledge(db, id, body, effectiveDate) {
+	db.prepare('UPDATE knowledge_entries SET body = ?, effective_date = ? WHERE id = ?').run(
+		body,
+		effectiveDate,
+		id
+	);
 }

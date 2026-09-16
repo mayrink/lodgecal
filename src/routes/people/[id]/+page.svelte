@@ -1,100 +1,229 @@
 <script>
-	import PersonForm from '$lib/components/PersonForm.svelte';
-	let { data, form } = $props();
-	const terms = $derived(data.lodge?.terminology ?? {});
+  import PersonForm from "$lib/components/PersonForm.svelte";
+  import FamilyMembers from "$lib/components/FamilyMembers.svelte";
+  import Icon from "$lib/components/Icon.svelte";
+  let { data, form } = $props();
+  let editDialog;
+  let addDialog;
+  let viewDialog;
+  let deleteDialog;
+  let selectedEntry = $state(null);
 
-	function confirmEnd(event) {
-		if (!confirm('End this relationship? The person record is kept.')) {
-			event.preventDefault();
-		}
-	}
+  function open(dialog, entry = null) {
+    selectedEntry = entry;
+    dialog?.showModal();
+  }
 </script>
 
-<div class="page-head">
-	<h1>{data.person.full_name}</h1>
-	{#if data.person.status !== 'ACTIVE'}
-		<span class="badge">{data.person.status}</span>
-	{/if}
+<div class="page-head profile-heading">
+  <div>
+    <h1>{data.person.full_name}</h1>
+    {#if data.person.status !== "ACTIVE"}
+      <span class="badge">{data.person.status}</span>
+    {/if}
+  </div>
+  <button
+    class="secondary icon-button"
+    type="button"
+    onclick={() => open(editDialog)}
+    aria-label="Edit person"
+    title="Edit details"><Icon name="edit" /></button
+  >
 </div>
 <p class="muted">Age (admin only): {data.age}</p>
 {#if form?.error}
-	<p class="error" role="alert">{form.error}</p>
+  <p class="error" role="alert">{form.error}</p>
 {/if}
 {#if form?.saved}
-	<p class="muted">Saved.</p>
+  <p class="muted">Saved.</p>
 {/if}
 
-<form method="POST" action="?/save" class="form-card wide stack">
-	<PersonForm person={data.person} csrf={data.csrf} showStatus={true} />
-</form>
-
-<section class="stack" style="margin-top:1.5rem;max-width:40rem">
-	<h2>Household</h2>
-	{#if data.userRow && data.household}
-		<p>This person is a Lodge member (User).</p>
-		{#if data.household.spouse}
-			<div>
-				{terms.spouse || 'Spouse'}: {data.household.spouse.full_name}
-				<form method="POST" action="?/endRelationship">
-					<input type="hidden" name="csrf" value={data.csrf} />
-					<input type="hidden" name="membershipId" value={data.household.spouse.membership_id} />
-					<button class="danger" type="submit" onclick={confirmEnd}>End relationship</button>
-				</form>
-			</div>
-		{/if}
-		<ul>
-			{#each data.household.children as child}
-				<li>
-					{child.full_name}
-					<form method="POST" action="?/endRelationship">
-						<input type="hidden" name="csrf" value={data.csrf} />
-						<input type="hidden" name="membershipId" value={child.membership_id} />
-						<button class="danger" type="submit" onclick={confirmEnd}>End relationship</button>
-					</form>
-				</li>
-			{/each}
-		</ul>
-	{:else}
-		<form method="POST" action="?/attach" class="stack">
-			<input type="hidden" name="csrf" value={data.csrf} />
-			<label for="householdUserId">Attach to member household</label>
-			<select id="householdUserId" name="householdUserId">
-				{#each data.heads as head}
-					<option value={head.user_id}>{head.full_name}</option>
-				{/each}
-			</select>
-			<label for="relationship">Relationship</label>
-			<select id="relationship" name="relationship">
-				<option value="SPOUSE">Spouse</option>
-				<option value="CHILD">Child</option>
-			</select>
-			<button type="submit">Attach</button>
-		</form>
-	{/if}
+<section class="profile-grid">
+  <div class="profile-summary">
+    <div class="form-card profile-card">
+      <div class="profile-field">
+        <span>Full name</span><strong>{data.person.full_name}</strong>
+      </div>
+      <div class="profile-fields">
+        <div class="profile-field">
+          <span>Gender</span><strong>{data.person.gender}</strong>
+        </div>
+        <div class="profile-field">
+          <span>Date of birth</span><strong>{data.person.birth_date}</strong>
+        </div>
+        <div class="profile-field">
+          <span>Email</span><strong
+            >{data.person.email || "Not provided"}</strong
+          >
+        </div>
+        <div class="profile-field">
+          <span>Phone</span><strong
+            >{data.person.phone || "Not provided"}</strong
+          >
+        </div>
+      </div>
+      <button
+        type="button"
+        class="wide-button"
+        onclick={() => open(editDialog)}
+      >
+        Edit details
+      </button>
+    </div>
+  </div>
+  <div class="form-card household-card">
+    {#if data.household}
+      <FamilyMembers
+        household={data.household}
+        currentPersonId={data.person.id}
+      />
+    {/if}
+  </div>
 </section>
 
-<section style="margin-top:1.5rem;max-width:40rem">
-	<h2>Dated knowledge</h2>
-	<form method="POST" action="?/addKnowledge" class="stack" style="margin-bottom:1rem">
-		<input type="hidden" name="csrf" value={data.csrf} />
-		<label for="body">New entry</label>
-		<textarea id="body" name="body" required></textarea>
-		<button type="submit">Add entry</button>
-	</form>
-	{#if data.knowledge.length === 0}
-		<p class="muted">No entries.</p>
-	{/if}
-	{#each data.knowledge as entry}
-		<article class="form-card" style="margin-bottom:0.65rem">
-			<p>{entry.body}</p>
-			<p class="muted">{entry.effective_date} — {entry.author_name}{entry.retired ? ' (retired)' : ''}</p>
-			{#if !entry.retired}
-				<form method="POST" action="?/retireKnowledge">
-					<input type="hidden" name="csrf" value={data.csrf} />
-					<input type="hidden" name="knowledgeId" value={entry.id} />
-					<button class="secondary" type="submit">Retire</button>
-				</form>
-			{/if}
-		</article>
-	{/each}
+<section class="knowledge-section">
+  <div class="section-heading">
+    <h2>Dated knowledge</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => open(addDialog)}
+      aria-label="Add dated knowledge"
+      title="Add information"><Icon name="plus" /></button
+    >
+  </div>
+  <div class="table-wrap">
+    <table class="knowledge-table">
+      <thead
+        ><tr
+          ><th>Data</th><th>Informação</th><th class="actions-column">Ações</th
+          ></tr
+        ></thead
+      ><tbody>
+        {#each data.knowledge as entry}
+          <tr class:retired-row={entry.retired}
+            ><td>{entry.effective_date}</td><td
+              >{entry.body}{entry.retired ? " (retired)" : ""}</td
+            ><td class="row-actions"
+              ><button
+                class="icon-button"
+                type="button"
+                onclick={() => open(viewDialog, entry)}
+                aria-label="View knowledge"
+                title="View"><Icon name="eye" /></button
+              >{#if !entry.retired}<button
+                  class="icon-button"
+                  type="button"
+                  onclick={() => open(editDialog, entry)}
+                  aria-label="Edit knowledge"
+                  title="Edit"><Icon name="edit" /></button
+                ><button
+                  class="icon-button danger-icon"
+                  type="button"
+                  onclick={() => open(deleteDialog, entry)}
+                  aria-label="Delete knowledge"
+                  title="Delete"><Icon name="trash" /></button
+                >{/if}</td
+            ></tr
+          >
+        {:else}<tr><td colspan="3" class="empty-cell">No entries yet.</td></tr
+          >{/each}
+      </tbody>
+    </table>
+  </div>
 </section>
+
+<dialog bind:this={editDialog} class="modal-dialog">
+  <div class="modal-heading">
+    <h2>{selectedEntry ? "Edit dated knowledge" : "Edit person"}</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => editDialog.close()}
+      aria-label="Close"><Icon name="close" /></button
+    >
+  </div>
+  {#if selectedEntry}<form method="POST" action="?/editKnowledge" class="stack">
+      <input type="hidden" name="csrf" value={data.csrf} /><input
+        type="hidden"
+        name="knowledgeId"
+        value={selectedEntry.id}
+      /><label for="edit-date">Date</label><input
+        id="edit-date"
+        name="effectiveDate"
+        type="date"
+        value={selectedEntry.effective_date}
+        required
+      /><label for="edit-body">Information</label><textarea
+        id="edit-body"
+        name="body"
+        required>{selectedEntry.body}</textarea
+      ><button type="submit">Save</button>
+    </form>{:else}<form method="POST" action="?/save" class="stack">
+      <PersonForm person={data.person} csrf={data.csrf} showStatus={true} />
+    </form>{/if}
+</dialog>
+<dialog bind:this={addDialog} class="modal-dialog">
+  <div class="modal-heading">
+    <h2>Add dated knowledge</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => addDialog.close()}
+      aria-label="Close"><Icon name="close" /></button
+    >
+  </div>
+  <form method="POST" action="?/addKnowledge" class="stack">
+    <input type="hidden" name="csrf" value={data.csrf} /><label for="new-date"
+      >Date</label
+    ><input
+      id="new-date"
+      name="effectiveDate"
+      type="date"
+      value={data.today}
+      required
+    /><label for="new-body">Information</label><textarea
+      id="new-body"
+      name="body"
+      required
+    ></textarea><button type="submit">Add information</button>
+  </form>
+</dialog>
+<dialog bind:this={viewDialog} class="modal-dialog">
+  <div class="modal-heading">
+    <h2>Dated knowledge</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => viewDialog.close()}
+      aria-label="Close"><Icon name="close" /></button
+    >
+  </div>
+  {#if selectedEntry}<p>{selectedEntry.body}</p>
+    <p class="muted">
+      {selectedEntry.effective_date} — {selectedEntry.author_name}
+    </p>{/if}
+</dialog>
+<dialog bind:this={deleteDialog} class="modal-dialog confirm-dialog">
+  <div class="modal-heading">
+    <h2>Delete information?</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => deleteDialog.close()}
+      aria-label="Close"><Icon name="close" /></button
+    >
+  </div>
+  <p>This entry will be removed from the active list.</p>
+  <form method="POST" action="?/deleteKnowledge" class="modal-actions">
+    <input type="hidden" name="csrf" value={data.csrf} /><input
+      type="hidden"
+      name="knowledgeId"
+      value={selectedEntry?.id ?? ""}
+    /><button
+      class="secondary"
+      type="button"
+      onclick={() => deleteDialog.close()}>No</button
+    ><button class="danger" type="submit">Yes, delete</button>
+  </form>
+</dialog>

@@ -4,7 +4,7 @@ import { recordAudit } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
 import { generateTemporaryPassword, hashPassword } from '$lib/server/passwords.js';
-import { insertPerson } from '$lib/server/repos/people.js';
+import { insertPerson, updatePerson } from '$lib/server/repos/people.js';
 import {
 	getUserById,
 	insertUser,
@@ -42,18 +42,30 @@ export const actions = {
 			return fail(400, { error: 'A User account requires a valid email login.' });
 		}
 		parsed.value.email = normalizeEmail(parsed.value.email);
-		const existing = locals.db.prepare('SELECT id FROM users u JOIN people p ON p.id = u.person_id WHERE p.email = ?').get(parsed.value.email);
-		if (existing) return fail(400, { error: 'An account with that email already exists.' });
+		const existing = locals.db
+			.prepare(
+				`SELECT p.id AS person_id, u.id AS user_id
+				 FROM people p
+				 LEFT JOIN users u ON u.person_id = p.id
+				 WHERE p.email = ?`
+			)
+			.get(parsed.value.email);
+		if (existing?.user_id) return fail(400, { error: 'An account with that email already exists.' });
 
 		const temp = generateTemporaryPassword();
 		const passwordHash = await hashPassword(temp);
-		const personId = insertPerson(locals.db, parsed.value);
-		const userId = insertUser(locals.db, {
-			personId,
-			passwordHash,
-			role,
-			mustChangePassword: true
+		const createAccount = locals.db.transaction(() => {
+			const personId = existing?.person_id ?? insertPerson(locals.db, parsed.value);
+			if (existing?.person_id) updatePerson(locals.db, personId, parsed.value);
+			const userId = insertUser(locals.db, {
+				personId,
+				passwordHash,
+				role,
+				mustChangePassword: true
+			});
+			return { personId, userId };
 		});
+		const { userId } = createAccount();
 		recordAudit(locals.db, {
 			actorUserId: admin.id,
 			actorEmail: locals.person?.email,
