@@ -252,14 +252,19 @@ textarea {
 }
 
 .app-shell {
-	display: flex;
+	display: grid;
+	grid-template-columns: var(--sidebar-width) 1fr;
 	min-height: 100vh;
 	width: min(100%, var(--app-max-width));
 	margin-inline: auto;
+	transition: grid-template-columns 160ms ease;
+}
+
+.app-shell.collapsed {
+	grid-template-columns: 4.25rem 1fr;
 }
 
 .app-shell.collapsed .sidebar {
-	width: 4.25rem;
 	padding-inline: 0.5rem;
 }
 
@@ -278,14 +283,12 @@ textarea {
 }
 
 .sidebar {
-	width: var(--sidebar-width);
 	background: var(--bg-elevated);
 	border-right: 1px solid var(--border);
 	padding: 1.25rem 0.85rem;
 	display: flex;
 	flex-direction: column;
 	gap: 0.35rem;
-	transition: width 160ms ease, padding 160ms ease;
 }
 
 .sidebar a {
@@ -408,13 +411,6 @@ textarea {
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-}
-
-.family-empty-state {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	justify-content: space-between;
 }
 
 .profile-fields {
@@ -582,10 +578,10 @@ textarea {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.25rem;
-	min-width: 2.25rem;
-	height: 2.25rem;
-	min-height: 2.25rem;
+	width: 2.75rem;
+	min-width: 2.75rem;
+	height: 2.75rem;
+	min-height: 2.75rem;
 	padding: 0.4rem;
 	border-radius: 50%;
 }
@@ -656,6 +652,17 @@ button.icon-button.secondary {
 .row-actions .icon-button:hover {
 	background: var(--bg-muted);
 	border-color: var(--border);
+}
+
+/* Table row actions stay compact for precise mouse/trackpad use, but grow to a
+   full 44px touch target on coarse pointers (touch), per WCAG 2.5.5. */
+@media (pointer: coarse) {
+	.row-actions .icon-button {
+		width: 2.75rem;
+		min-width: 2.75rem;
+		height: 2.75rem;
+		min-height: 2.75rem;
+	}
 }
 
 .retired-row {
@@ -800,11 +807,12 @@ code {
 		position: fixed;
 		inset: 0;
 		border: 0;
-		background: rgba(20, 16, 12, 0.45);
+		background: rgba(42, 33, 24, 0.42);
 		z-index: 9;
 	}
 
 	.sidebar {
+		width: var(--sidebar-width);
 		position: fixed;
 		inset: 0 auto 0 0;
 		transform: translateX(-105%);

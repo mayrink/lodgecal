@@ -5,7 +5,7 @@ import { resolveRecurrence } from '../events.js';
  * @param {import('better-sqlite3').Database} db
  */
 export function listEvents(db) {
-	const rows = db
+	return db
 		.prepare(
 			`SELECT e.*, et.key AS type_key, et.label AS type_label, et.allows_recurrence
 			 FROM events e
@@ -13,45 +13,6 @@ export function listEvents(db) {
 			 ORDER BY e.iso_date DESC, e.title COLLATE NOCASE`
 		)
 		.all();
-	const peopleStmt = db.prepare(
-		`SELECT p.* FROM event_people ep JOIN people p ON p.id = ep.person_id WHERE ep.event_id = ?`
-	);
-	return rows.map((row) => ({ ...row, people: peopleStmt.all(row.id) }));
-}
-
-/**
- * @param {import('better-sqlite3').Database} db
- * @param {number} id
- */
-export function getEventById(db, id) {
-	const row = db
-		.prepare(
-			`SELECT e.*, et.key AS type_key, et.label AS type_label, et.allows_recurrence, et.derived
-			 FROM events e
-			 JOIN event_types et ON et.id = e.event_type_id
-			 WHERE e.id = ?`
-		)
-		.get(id);
-	if (!row) return null;
-	row.people = db
-		.prepare(
-			`SELECT p.* FROM event_people ep JOIN people p ON p.id = ep.person_id WHERE ep.event_id = ?`
-		)
-		.all(id);
-	return row;
-}
-
-/**
- * @param {import('better-sqlite3').Database} db
- * @param {number} eventId
- * @param {number[]} personIds
- */
-export function setEventPeople(db, eventId, personIds) {
-	db.prepare('DELETE FROM event_people WHERE event_id = ?').run(eventId);
-	const link = db.prepare('INSERT INTO event_people (event_id, person_id) VALUES (?, ?)');
-	for (const personId of personIds) {
-		link.run(eventId, personId);
-	}
 }
 
 /**
@@ -62,9 +23,9 @@ export function setEventPeople(db, eventId, personIds) {
  *   title: string,
  *   isoDate: string,
  *   details?: string,
+ *   personName?: string,
  *   recurring?: boolean,
- *   status?: string,
- *   personIds?: number[]
+ *   status?: string
  * }} input
  * @param {object} eventType
  * @returns {{ ok: true } | { ok: false, error: string }}
@@ -74,19 +35,19 @@ export function updateEvent(db, id, input, eventType) {
 	if (!recurrence.ok) return recurrence;
 	db.prepare(
 		`UPDATE events
-		 SET event_type_id = ?, title = ?, iso_date = ?, details = ?, recurring = ?, status = ?, updated_at = ?
+		 SET event_type_id = ?, title = ?, iso_date = ?, details = ?, person_name = ?, recurring = ?, status = ?, updated_at = ?
 		 WHERE id = ?`
 	).run(
 		input.eventTypeId,
 		input.title,
 		input.isoDate,
 		input.details ?? '',
+		input.personName ?? '',
 		recurrence.recurring ? 1 : 0,
 		input.status || 'ACTIVE',
 		nowIso(),
 		id
 	);
-	if (input.personIds) setEventPeople(db, id, input.personIds);
 	return { ok: true };
 }
 
@@ -96,6 +57,14 @@ export function updateEvent(db, id, input, eventType) {
  */
 export function archiveEvent(db, id) {
 	db.prepare(`UPDATE events SET status = 'ARCHIVED', updated_at = ? WHERE id = ?`).run(nowIso(), id);
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} id
+ */
+export function reactivateEvent(db, id) {
+	db.prepare(`UPDATE events SET status = 'ACTIVE', updated_at = ? WHERE id = ?`).run(nowIso(), id);
 }
 
 /**
@@ -122,4 +91,15 @@ export function updateEventType(db, id, input) {
 	db.prepare(
 		`UPDATE event_types SET label = ?, allows_recurrence = ?, updated_at = ? WHERE id = ? AND is_system = 0`
 	).run(input.label, input.allowsRecurrence ? 1 : 0, nowIso(), id);
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} id
+ * @param {boolean} isActive
+ */
+export function setEventTypeActive(db, id, isActive) {
+	db.prepare(
+		`UPDATE event_types SET is_active = ?, updated_at = ? WHERE id = ? AND is_system = 0`
+	).run(isActive ? 1 : 0, nowIso(), id);
 }

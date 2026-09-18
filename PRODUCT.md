@@ -10,7 +10,7 @@ web
 
 Primary user: the Lodge admin (Chancellor-equivalent officer) — currently Georges himself — who maintains people, households, events, event types, users, and Lodge settings.
 
-Secondary users: Lodge Brothers with the USER role, who view the dashboard and manage only their own Person record and their own household (spouse/children), and add dated-knowledge entries for their own household.
+Secondary users: Lodge Brothers with the USER role. They see only the main pages (Home, My Details, My Family) — the entire Administration menu (People, Events, Event Types, Users, Lodge/Settings) is hidden from them. Within their own household they can view and edit their own Person record, view their spouse/children, create new family members, and add dated-knowledge entries — but they cannot delete a family member (removal is admin-only) and cannot see or edit any other household's data at all.
 
 ## Product Purpose
 
@@ -26,6 +26,8 @@ Single-Lodge, self-hosted deployment — not a multi-tenant SaaS. The Lodge prof
 
 The app is already in real use: `data/lodgecal.sqlite` holds live Lodge data (not demo/seed data), with an active WAL file from ongoing use.
 
+Georges plans to publish LodgeCal as open source. Future work should keep this in mind: no real Lodge data, secrets, or personal information belongs in the committed source (the live SQLite database and its WAL/SHM files must stay out of version control), and anything added for a public release (LICENSE, contributor-facing README, issue templates) is a separate later task, not a blocker for current feature work.
+
 ## Capabilities and Constraints
 
 - Exactly two roles, ADMIN and USER, enforced in server `load`/`actions`/`hooks.server.js`, not only by hiding navigation.
@@ -34,7 +36,10 @@ The app is already in real use: `data/lodgecal.sqlite` holds live Lodge data (no
 - "Dated knowledge" entries (e.g., a recent PhD, an artistic talent) are append-only historical records per person, not a single editable notes field.
 - All date-only logic (birthdays, recurrence, sorting) goes through one Temporal-based utility; birthdays follow an explicit Feb 29 → Feb 28 rule in non-leap years.
 - Security: Argon2id password hashing, forced password change at first login, opaque server-side sessions (HttpOnly/SameSite cookies), CSRF protection, failed-login throttling, and an audit log of logins and material changes.
-- Explicitly out of scope for this build: multi-Lodge tenancy, i18n, messaging, file/image uploads stored in the app, a public calendar, and a general family tree.
+- Regular users (USER role) can create family members and edit their own household, but only an admin can remove one — enforced server-side, not just by hiding a button.
+- Regular users have zero visibility into any household but their own; there is no "browse other members" path for the USER role anywhere in the app.
+- The interface language is English today, by Georges's own working preference, even though the Lodge this instance serves is Brazilian and the intended eventual language is Brazilian Portuguese. Localization (pt-BR, with English likely kept as a second language) is planned but not yet built — treat any stray non-English string in the current UI as unfinished copy to fix now, not as evidence that i18n has already started.
+- Explicitly out of scope for *this build* (not necessarily forever): multi-Lodge tenancy, a full i18n/locale-switching framework, messaging, file/image uploads stored in the app, a public calendar, and a general family tree.
 
 ## Brand Commitments
 

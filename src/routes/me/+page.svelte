@@ -72,19 +72,19 @@
       <FamilyMembers
         household={data.household}
         currentPersonId={data.person.id}
+        adminLinks={data.isAdmin}
+        dependentLinks={!data.isAdmin}
       />
     {:else}
-      <div class="family-empty-state">
-        <p class="muted">No family members on record.</p>
-        <button
-          type="button"
-          class="wide-button"
-          onclick={() => familyDialog.showModal()}
-        >
-          Add family member
-        </button>
-      </div>
+      <p class="muted family-empty">No family members on record.</p>
     {/if}
+    <button
+      type="button"
+      class="wide-button"
+      onclick={() => familyDialog.showModal()}
+    >
+      Add family member
+    </button>
   </div>
 </section>
 
@@ -103,7 +103,7 @@
     <table class="knowledge-table">
       <thead
         ><tr
-          ><th>Data</th><th>Informação</th><th class="actions-column">Ações</th
+          ><th>Date</th><th>Information</th><th class="actions-column">Actions</th
           ></tr
         ></thead
       >

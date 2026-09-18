@@ -3,10 +3,8 @@ import { PERSON_STATUS, RELATIONSHIPS } from '$lib/constants.js';
 import { recordAudit } from '$lib/server/audit.js';
 import { requireUser } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
-import { insertKnowledge, listKnowledge } from '$lib/server/repos/knowledge.js';
 import {
 	addHouseholdMember,
-	canAccessPerson,
 	getHousehold,
 	getPersonById,
 	insertPerson,
@@ -15,17 +13,13 @@ import {
 } from '$lib/server/repos/people.js';
 import { asString, validatePersonInput } from '$lib/server/validation.js';
 
-function withKnowledge(db, household) {
-	if (!household) return household;
-	const attach = (person) =>
-		person ? { ...person, knowledge: listKnowledge(db, person.id) } : person;
-	const spouse = household.spouse && !personHasUserAccount(db, household.spouse.id)
-		? attach(household.spouse)
-		: null;
-	const children = household.children
-		.filter((child) => !personHasUserAccount(db, child.id))
-		.map(attach);
-	return { ...household, spouse, children };
+function shapeHousehold(household) {
+	if (!household) return null;
+	const mark = (person) => (person ? { ...person, hasAccount: Boolean(person.has_account) } : null);
+	return {
+		spouse: mark(household.spouse),
+		children: (household.children ?? []).map(mark)
+	};
 }
 
 /** @type {import('./$types').PageServerLoad} */
@@ -33,8 +27,7 @@ export function load({ locals }) {
 	const user = requireUser(locals);
 	return {
 		csrf: locals.csrf,
-		household: withKnowledge(locals.db, getHousehold(locals.db, user.id)),
-		isAdmin: user.role === 'ADMIN'
+		household: shapeHousehold(getHousehold(locals.db, user.id))
 	};
 }
 
@@ -78,11 +71,14 @@ export const actions = {
 		const csrf = csrfError(form, locals);
 		if (csrf) return fail(403, { error: csrf });
 		const personId = Number(asString(form.get('personId')));
-		if (!canAccessPerson(locals.db, user, personId) || personId === user.personId) {
+		const household = getHousehold(locals.db, user.id);
+		const belongs =
+			household?.spouse?.id === personId || (household?.children ?? []).some((c) => c.id === personId);
+		if (!belongs) {
 			return fail(403, { error: 'You may only edit your own household members.' });
 		}
 		if (personHasUserAccount(locals.db, personId)) {
-			return fail(403, { error: 'That person is a Lodge member and is not shown as a dependent.' });
+			return fail(403, { error: 'That person is a Lodge member and manages their own account.' });
 		}
 		const before = getPersonById(locals.db, personId);
 		if (!before) return fail(404, { error: 'Person not found.' });
@@ -103,33 +99,6 @@ export const actions = {
 			entityType: 'person',
 			entityId: personId,
 			summary: `Updated household member ${parsed.value.fullName}`
-		});
-		return { saved: true };
-	},
-
-	knowledge: async ({ request, locals }) => {
-		const user = requireUser(locals);
-		const form = await request.formData();
-		const csrf = csrfError(form, locals);
-		if (csrf) return fail(403, { error: csrf });
-		const personId = Number(asString(form.get('personId')));
-		const body = asString(form.get('body'));
-		if (!body) return fail(400, { error: 'Knowledge text is required.' });
-		if (!canAccessPerson(locals.db, user, personId)) {
-			return fail(403, { error: 'You may only add knowledge for your own household.' });
-		}
-		const id = insertKnowledge(locals.db, {
-			personId,
-			body,
-			authorUserId: user.id
-		});
-		recordAudit(locals.db, {
-			actorUserId: user.id,
-			actorEmail: locals.person?.email,
-			action: 'knowledge_create',
-			entityType: 'knowledge',
-			entityId: id,
-			summary: `Added knowledge for person ${personId}`
 		});
 		return { saved: true };
 	}

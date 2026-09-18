@@ -27,7 +27,7 @@ export function childLabel(person, terminology) {
  * @param {{
  *   kind: string,
  *   person?: object,
- *   relatedPeople?: object[],
+ *   personName?: string,
  *   typeLabel?: string,
  *   owner?: object | null,
  *   relationship?: string | null
@@ -45,9 +45,8 @@ export function itemContext(item, terminology) {
 		}
 		return honorificName(item.person, terminology);
 	}
-	if (item.relatedPeople?.length) {
-		const names = item.relatedPeople.map((p) => honorificName(p, terminology)).join(', ');
-		return `${item.typeLabel}: ${names}`;
+	if (item.personName) {
+		return `${item.typeLabel}: ${item.personName}`;
 	}
 	return item.typeLabel || 'Event';
 }

@@ -103,19 +103,12 @@ export function collectUpcoming(db, opts) {
 
 	for (const event of listEvents(db)) {
 		if (event.status !== 'ACTIVE') continue;
-		const relatedInactive = event.people.some((p) => p.status !== PERSON_STATUS.ACTIVE);
-		if (relatedInactive && !opts.includeInactive) {
-			const allInactive = event.people.length > 0 && event.people.every((p) => p.status !== PERSON_STATUS.ACTIVE);
-			if (allInactive) continue;
-		}
 		const dates = occurrencesInRange(
 			{ isoDate: event.iso_date, recurring: Boolean(event.recurring) },
 			opts.from,
 			opts.to
 		);
 		for (const date of dates) {
-			const inactive = relatedInactive;
-			if (inactive && !opts.includeInactive) continue;
 			items.push({
 				id: `evt-${event.id}-${date.toString()}`,
 				kind: 'event',
@@ -125,13 +118,13 @@ export function collectUpcoming(db, opts) {
 				context: itemContext(
 					{
 						kind: 'event',
-						relatedPeople: event.people,
+						personName: event.person_name,
 						typeLabel: event.type_label
 					},
 					opts.terminology
 				),
 				eventId: event.id,
-				inactive,
+				inactive: false,
 				linkable: false
 			});
 		}

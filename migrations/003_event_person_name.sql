@@ -1,0 +1,1 @@
+ALTER TABLE events ADD COLUMN person_name TEXT NOT NULL DEFAULT '';

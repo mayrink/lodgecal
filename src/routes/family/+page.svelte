@@ -1,10 +1,43 @@
 <script>
+	import Icon from '$lib/components/Icon.svelte';
 	import PersonForm from '$lib/components/PersonForm.svelte';
+
 	let { data, form } = $props();
 	const terms = $derived(data.lodge?.terminology ?? {});
+
+	let addDialog;
+	let editDialog;
+	let editTarget = $state(null);
+
+	function openAdd() {
+		editTarget = null;
+		addDialog?.showModal();
+	}
+
+	function openEdit(member) {
+		editTarget = member;
+		editDialog?.showModal();
+	}
+
+	function relationLabel(member) {
+		if (member.relationship === 'SPOUSE') return terms.spouse || 'Spouse';
+		if (member.gender === 'MALE') return terms.son || 'Son';
+		if (member.gender === 'FEMALE') return terms.daughter || 'Daughter';
+		return terms.child || 'Child';
+	}
+
+	const rows = $derived(
+		[
+			data.household?.spouse ? { ...data.household.spouse, relationship: 'SPOUSE' } : null,
+			...(data.household?.children ?? []).map((child) => ({ ...child, relationship: 'CHILD' }))
+		].filter(Boolean)
+	);
 </script>
 
-<h1>My Family</h1>
+<div class="page-head">
+	<h1>My Family</h1>
+	<button type="button" onclick={openAdd}>Add family member</button>
+</div>
 {#if form?.error}
 	<p class="error" role="alert">{form.error}</p>
 {/if}
@@ -12,62 +45,79 @@
 	<p class="muted">Saved.</p>
 {/if}
 
-{#if data.household?.spouse}
-	<section class="form-card" style="margin-bottom:1rem">
-		<h2>{terms.spouse || 'Spouse'}</h2>
-		<form method="POST" action="?/saveMember" class="stack">
-			<input type="hidden" name="personId" value={data.household.spouse.id} />
-			<PersonForm person={data.household.spouse} csrf={data.csrf} submitLabel="Save spouse" />
-		</form>
-		{#each data.household.spouse.knowledge as entry}
-			<p>{entry.body} <span class="muted">({entry.effective_date})</span></p>
-		{/each}
-		<form method="POST" action="?/knowledge" class="stack">
-			<input type="hidden" name="csrf" value={data.csrf} />
-			<input type="hidden" name="personId" value={data.household.spouse.id} />
-			<label for="spouse-body">Add knowledge</label>
-			<textarea id="spouse-body" name="body" required></textarea>
-			<button type="submit">Add</button>
-		</form>
-	</section>
-{:else}
-	<section class="form-card" style="margin-bottom:1rem">
-		<h2>Add {terms.spouse || 'spouse'}</h2>
-		<form method="POST" action="?/addMember" class="stack">
-			<input type="hidden" name="relationship" value="SPOUSE" />
-			<PersonForm csrf={data.csrf} submitLabel="Add spouse" />
-		</form>
-	</section>
-{/if}
-
-<section>
-	<h2>{terms.child || 'Children'}</h2>
-	{#each data.household?.children ?? [] as child}
-		<article class="form-card" style="margin-bottom:0.75rem">
-			<form method="POST" action="?/saveMember" class="stack">
-				<input type="hidden" name="personId" value={child.id} />
-				<PersonForm person={child} csrf={data.csrf} submitLabel="Save child" />
-			</form>
-			{#each child.knowledge as entry}
-				<p>{entry.body} <span class="muted">({entry.effective_date})</span></p>
+<div class="table-wrap">
+	<table>
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>Relationship</th>
+				<th>Date of birth</th>
+				<th class="actions-column">Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each rows as member}
+				<tr>
+					<td>{member.full_name}</td>
+					<td>{relationLabel(member)}</td>
+					<td>{member.hasAccount ? '—' : member.birth_date}</td>
+					<td class="row-actions">
+						{#if member.hasAccount}
+							<span class="muted">Manages their own account</span>
+						{:else}
+							<button
+								class="icon-button"
+								type="button"
+								onclick={() => openEdit(member)}
+								aria-label="Edit {member.full_name}"
+								title="Edit"><Icon name="edit" /></button
+							>
+						{/if}
+					</td>
+				</tr>
+			{:else}
+				<tr><td colspan="4" class="empty-cell">No family members on record.</td></tr>
 			{/each}
-			<form method="POST" action="?/knowledge" class="stack">
-				<input type="hidden" name="csrf" value={data.csrf} />
-				<input type="hidden" name="personId" value={child.id} />
-				<label for="child-body-{child.id}">Add knowledge</label>
-				<textarea id="child-body-{child.id}" name="body" required></textarea>
-				<button type="submit">Add</button>
-			</form>
-		</article>
-	{:else}
-		<p class="muted">No children on record.</p>
-	{/each}
+		</tbody>
+	</table>
+</div>
 
-	<div class="form-card">
-		<h2>Add {terms.child || 'child'}</h2>
-		<form method="POST" action="?/addMember" class="stack">
-			<input type="hidden" name="relationship" value="CHILD" />
-			<PersonForm csrf={data.csrf} submitLabel="Add child" />
-		</form>
+<dialog bind:this={addDialog} class="modal-dialog">
+	<div class="modal-heading">
+		<h2>Add family member</h2>
+		<button
+			class="icon-button"
+			type="button"
+			onclick={() => addDialog.close()}
+			aria-label="Close"><Icon name="close" /></button
+		>
 	</div>
-</section>
+	<form method="POST" action="?/addMember" class="stack">
+		<input type="hidden" name="csrf" value={data.csrf} />
+		<label for="family-relationship">Relationship</label>
+		<select id="family-relationship" name="relationship" required>
+			<option value="SPOUSE">{terms.spouse || 'Spouse'}</option>
+			<option value="CHILD">{terms.child || 'Child'}</option>
+		</select>
+		<PersonForm csrf={data.csrf} submitLabel="Add family member" />
+	</form>
+</dialog>
+
+<dialog bind:this={editDialog} class="modal-dialog">
+	<div class="modal-heading">
+		<h2>Edit {editTarget?.full_name ?? 'family member'}</h2>
+		<button
+			class="icon-button"
+			type="button"
+			onclick={() => editDialog.close()}
+			aria-label="Close"><Icon name="close" /></button
+		>
+	</div>
+	{#if editTarget}
+		<form method="POST" action="?/saveMember" class="stack">
+			<input type="hidden" name="personId" value={editTarget.id} />
+			<PersonForm person={editTarget} csrf={data.csrf} submitLabel="Save" />
+		</form>
+		<a class="text-link" href="/family/{editTarget.id}">View dated knowledge</a>
+	{/if}
+</dialog>

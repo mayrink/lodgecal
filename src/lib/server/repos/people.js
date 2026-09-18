@@ -117,7 +117,8 @@ export function getHousehold(db, userId) {
 
 	const members = db
 		.prepare(
-			`SELECT hm.id AS membership_id, hm.relationship, hm.ended_at, p.*
+			`SELECT hm.id AS membership_id, hm.relationship, hm.ended_at, p.*,
+			        EXISTS(SELECT 1 FROM users u2 WHERE u2.person_id = p.id) AS has_account
 			 FROM household_memberships hm
 			 JOIN people p ON p.id = hm.person_id
 			 WHERE hm.user_id = ? AND hm.ended_at IS NULL

@@ -7,11 +7,18 @@
   let addDialog;
   let viewDialog;
   let deleteDialog;
+  let removeDialog;
   let selectedEntry = $state(null);
+  let selectedMember = $state(null);
 
   function open(dialog, entry = null) {
     selectedEntry = entry;
     dialog?.showModal();
+  }
+
+  function openRemove(member) {
+    selectedMember = member;
+    removeDialog?.showModal();
   }
 </script>
 
@@ -76,6 +83,9 @@
       <FamilyMembers
         household={data.household}
         currentPersonId={data.person.id}
+        adminLinks={true}
+        removable={true}
+        onRemove={openRemove}
       />
     {/if}
   </div>
@@ -96,7 +106,7 @@
     <table class="knowledge-table">
       <thead
         ><tr
-          ><th>Data</th><th>Informação</th><th class="actions-column">Ações</th
+          ><th>Date</th><th>Information</th><th class="actions-column">Actions</th
           ></tr
         ></thead
       ><tbody>
@@ -225,5 +235,31 @@
       type="button"
       onclick={() => deleteDialog.close()}>No</button
     ><button class="danger" type="submit">Yes, delete</button>
+  </form>
+</dialog>
+<dialog bind:this={removeDialog} class="modal-dialog confirm-dialog">
+  <div class="modal-heading">
+    <h2>Remove from household?</h2>
+    <button
+      class="icon-button"
+      type="button"
+      onclick={() => removeDialog.close()}
+      aria-label="Close"><Icon name="close" /></button
+    >
+  </div>
+  <p>
+    {selectedMember?.full_name} will be removed from this household. Their own
+    person record is not deleted.
+  </p>
+  <form method="POST" action="?/endRelationship" class="modal-actions">
+    <input type="hidden" name="csrf" value={data.csrf} /><input
+      type="hidden"
+      name="membershipId"
+      value={selectedMember?.membership_id ?? ""}
+    /><button
+      class="secondary"
+      type="button"
+      onclick={() => removeDialog.close()}>No</button
+    ><button class="danger" type="submit">Yes, remove</button>
   </form>
 </dialog>

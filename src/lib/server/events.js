@@ -44,8 +44,8 @@ export function resolveRecurrence(eventType, requested) {
  *   title: string,
  *   isoDate: string,
  *   details?: string,
- *   recurring?: boolean,
- *   personIds?: number[]
+ *   personName?: string,
+ *   recurring?: boolean
  * }} input
  * @returns {{ ok: true, id: number } | { ok: false, error: string }}
  */
@@ -57,25 +57,20 @@ export function createEvent(db, input) {
 	const ts = nowIso();
 	const result = db
 		.prepare(
-			`INSERT INTO events (event_type_id, title, iso_date, details, recurring, status, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
+			`INSERT INTO events (event_type_id, title, iso_date, details, person_name, recurring, status, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
 		)
 		.run(
 			input.eventTypeId,
 			input.title,
 			input.isoDate,
 			input.details ?? '',
+			input.personName ?? '',
 			recurrence.recurring ? 1 : 0,
 			ts,
 			ts
 		);
 	const id = Number(result.lastInsertRowid);
-	if (input.personIds?.length) {
-		const link = db.prepare('INSERT INTO event_people (event_id, person_id) VALUES (?, ?)');
-		for (const personId of input.personIds) {
-			link.run(id, personId);
-		}
-	}
 	return { ok: true, id };
 }
 

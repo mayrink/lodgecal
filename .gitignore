@@ -82,3 +82,11 @@ Thumbs.db
 # ----------------------------------------------------------------------------
 .cache/
 
+# ----------------------------------------------------------------------------
+# Local SQLite database (live Lodge data — created automatically on first
+# request by src/lib/server/db.js; never commit real data)
+# ----------------------------------------------------------------------------
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+
