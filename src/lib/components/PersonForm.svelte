@@ -13,7 +13,7 @@
 <div class="field-grid">
 	<div class="field field-full">
 		<label for="fullName">Full name</label>
-		<input id="fullName" name="fullName" value={person?.full_name ?? person?.fullName ?? ''} required />
+		<input id="fullName" name="fullName" value={person?.full_name ?? person?.fullName ?? ''} required autocomplete="name" />
 	</div>
 	<div class="field">
 		<label for="gender">Gender</label>
@@ -42,11 +42,12 @@
 			type="email"
 			value={person?.email ?? ''}
 			required={emailRequired}
+			autocomplete="email"
 		/>
 	</div>
 	<div class="field">
 		<label for="phone">Phone</label>
-		<input id="phone" name="phone" value={person?.phone ?? ''} />
+		<input id="phone" name="phone" type="tel" value={person?.phone ?? ''} autocomplete="tel" />
 	</div>
 	{#if showStatus}
 		<div class="field">
