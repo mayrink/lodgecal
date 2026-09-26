@@ -15,4 +15,9 @@ describe('display terminology', () => {
 			)
 		).toBe('Spouse of Bro∴ Georges Mayrink');
 	});
+
+	it('does not repeat a standalone birthday subject in its context line', () => {
+		const person = { full_name: 'Georges Mayrink', gender: 'MALE' };
+		expect(itemContext({ kind: 'birthday', person, typeLabel: 'Birthday' }, terms)).toBe('Birthday');
+	});
 });

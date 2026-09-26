@@ -43,7 +43,7 @@ export function itemContext(item, terminology) {
 		if (item.owner && item.relationship === 'CHILD') {
 			return `${childLabel(item.person, terminology)} of ${honorificName(item.owner, terminology)}`;
 		}
-		return honorificName(item.person, terminology);
+		return item.typeLabel || 'Birthday';
 	}
 	if (item.personName) {
 		return `${item.typeLabel}: ${item.personName}`;

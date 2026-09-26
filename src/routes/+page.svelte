@@ -1,6 +1,22 @@
 <script>
+	import { Temporal } from '$lib/dates.js';
 	import UpcomingRow from '$lib/components/UpcomingRow.svelte';
 	let { data } = $props();
+
+	const dateRange = $derived.by(() => {
+		const from = Temporal.PlainDate.from(data.from);
+		const to = Temporal.PlainDate.from(data.to);
+		const fromOptions = { month: 'short', day: 'numeric' };
+		if (from.year !== to.year) fromOptions.year = 'numeric';
+		return {
+			from: from.toLocaleString('en', fromOptions),
+			to: to.toLocaleString('en', {
+				month: 'short',
+				day: 'numeric',
+				year: 'numeric',
+			}),
+		};
+	});
 </script>
 
 <h1>Home</h1>
@@ -30,7 +46,11 @@
 
 <section class="panel">
 	<h2>Upcoming Birthdays &amp; Events</h2>
-	<p class="muted">{data.from} to {data.to}</p>
+	<p class="muted period-range">
+		<time datetime={data.from}>{dateRange.from}</time>
+		<span aria-hidden="true">–</span>
+		<time datetime={data.to}>{dateRange.to}</time>
+	</p>
 	{#each data.upcoming as item}
 		<UpcomingRow {item} />
 	{:else}

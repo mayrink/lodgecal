@@ -40,6 +40,9 @@ test('first-run setup, login, and dashboard', async ({ page }) => {
 	if ((await page.locator('h1').innerText()) === 'Home') {
 		await expect(page.getByText('Upcoming Birthdays')).toBeVisible();
 		await expect(page.getByText('Active Brothers')).toBeVisible();
+		await expect(page.locator('.period-range')).toHaveText(
+			/^[A-Z][a-z]{2} \d{1,2}(?:, \d{4})? – [A-Z][a-z]{2} \d{1,2}, \d{4}$/
+		);
 
 		await page.getByRole('button', { name: 'Collapse sidebar' }).click();
 		await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
