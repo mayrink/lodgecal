@@ -1,4 +1,5 @@
 <script>
+  import { sortableTable } from "$lib/sortable-table.js";
   import PersonForm from "$lib/components/PersonForm.svelte";
   import FamilyMembers from "$lib/components/FamilyMembers.svelte";
   import Icon from "$lib/components/Icon.svelte";
@@ -72,6 +73,7 @@
       <FamilyMembers
         household={data.household}
         currentPersonId={data.person.id}
+        olderFirst={true}
         adminLinks={data.isAdmin}
         dependentLinks={!data.isAdmin}
       />
@@ -100,10 +102,11 @@
     >
   </div>
   <div class="table-wrap">
-    <table class="knowledge-table">
+    <table class="knowledge-table" use:sortableTable>
       <thead
         ><tr
-          ><th>Date</th><th>Information</th><th class="actions-column">Actions</th
+          ><th>Date</th><th>Information</th><th class="actions-column"
+            >Actions</th
           ></tr
         ></thead
       >

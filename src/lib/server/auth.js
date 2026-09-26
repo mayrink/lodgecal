@@ -1,5 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
-import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS, ROLES, SESSION_COOKIE } from '../constants.js';
+import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS, PERSON_STATUS, ROLES, SESSION_COOKIE } from '../constants.js';
 import { recordAudit, recordLoginAttempt } from './audit.js';
 import { getDb } from './db.js';
 import { verifyPassword } from './passwords.js';
@@ -61,7 +61,7 @@ export async function login(db, cookies, email, password) {
 	const user = getUserByEmail(db, emailNormalized);
 	const passwordOk = user ? await verifyPassword(user.password_hash, password) : false;
 
-	if (!user || !passwordOk) {
+	if (!user || user.person_status !== PERSON_STATUS.ACTIVE || !passwordOk) {
 		recordLoginAttempt(db, emailNormalized, false);
 		recordAudit(db, {
 			actorEmail: emailNormalized,

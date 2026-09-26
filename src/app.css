@@ -586,6 +586,15 @@ textarea {
 	border-radius: 50%;
 }
 
+.add-user-button {
+	width: 2.5rem;
+	min-width: 2.5rem;
+	height: 2.5rem;
+	min-height: 2.5rem;
+	padding: 0.35rem;
+	border-radius: 4px;
+}
+
 button.icon-button.secondary {
 	background: transparent;
 	color: var(--accent);
@@ -634,9 +643,36 @@ button.icon-button.secondary {
 	text-align: right;
 }
 
+.users-table .actions-column {
+	width: 11rem;
+}
+
+.generated-password {
+	padding: 0.75rem;
+	border: 1px solid var(--success);
+	border-radius: 4px;
+	color: var(--success);
+	background: var(--surface);
+	overflow-wrap: anywhere;
+}
+
 .row-actions {
 	text-align: right;
 	white-space: nowrap;
+}
+
+.user-row-actions {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.25rem;
+}
+
+.user-row-actions .inline-form {
+	display: inline-flex;
+	flex: 0 0 auto;
+	flex-wrap: nowrap;
 }
 
 .row-actions .icon-button {
@@ -732,6 +768,49 @@ th {
 	letter-spacing: 0.04em;
 	color: var(--text-muted);
 	background: var(--bg-muted);
+}
+
+.sort-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	min-height: 1.5rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-align: left;
+	text-transform: inherit;
+	cursor: pointer;
+}
+
+.sort-button::after {
+	content: '↕';
+	opacity: 0.45;
+	font-size: 0.85em;
+}
+
+.sort-button:hover {
+	background: transparent;
+	color: inherit;
+}
+
+th[aria-sort='ascending'] .sort-button::after {
+	content: '↑';
+	opacity: 1;
+}
+
+th[aria-sort='descending'] .sort-button::after {
+	content: '↓';
+	opacity: 1;
+}
+
+.sort-button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 tr.inactive td {

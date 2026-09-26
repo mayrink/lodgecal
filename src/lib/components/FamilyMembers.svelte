@@ -8,8 +8,20 @@
     adminLinks = false,
     dependentLinks = false,
     removable = false,
+    olderFirst = false,
     onRemove = null,
   } = $props();
+
+  function orderMembersByAge(items) {
+    if (!olderFirst) return items;
+    return [...items].sort((left, right) => {
+      const leftBirthDate = left.birth_date ?? "";
+      const rightBirthDate = right.birth_date ?? "";
+      if (!leftBirthDate) return rightBirthDate ? 1 : 0;
+      if (!rightBirthDate) return -1;
+      return leftBirthDate.localeCompare(rightBirthDate);
+    });
+  }
 
   function relationLabel(member) {
     if (member.relationship === "PARENT") {
@@ -53,26 +65,33 @@
     );
 
     if (viewingHead) {
-      return [household.spouse, ...children].filter(Boolean).map((member) => ({
-        ...member,
-        relationship: member === household.spouse ? "SPOUSE" : "CHILD",
-        hasAccount: member.has_account,
-      }));
+      return orderMembersByAge(
+        [household.spouse, ...children].filter(Boolean).map((member) => ({
+          ...member,
+          relationship: member === household.spouse ? "SPOUSE" : "CHILD",
+          hasAccount: member.has_account,
+        })),
+      );
     }
 
     if (viewingSpouse) {
-      return [household.user, ...children].filter(Boolean).map((member) => ({
-        ...member,
-        relationship: member === household.user ? "SPOUSE" : "CHILD",
-        hasAccount: member === household.user ? true : member.has_account,
-      }));
+      return orderMembersByAge(
+        [household.user, ...children].filter(Boolean).map((member) => ({
+          ...member,
+          relationship: member === household.user ? "SPOUSE" : "CHILD",
+          hasAccount: member === household.user ? true : member.has_account,
+        })),
+      );
     }
 
-    return [head, spouse, ...children].filter(Boolean).map((member) => ({
-      ...member,
-      relationship: member === head || member === spouse ? "PARENT" : "SIBLING",
-      hasAccount: member === head ? true : member.has_account,
-    }));
+    return orderMembersByAge(
+      [head, spouse, ...children].filter(Boolean).map((member) => ({
+        ...member,
+        relationship:
+          member === head || member === spouse ? "PARENT" : "SIBLING",
+        hasAccount: member === head ? true : member.has_account,
+      })),
+    );
   });
 </script>
 

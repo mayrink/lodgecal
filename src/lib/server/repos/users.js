@@ -32,7 +32,7 @@ export function getUserById(db, id) {
 		.prepare(
 			`SELECT u.*, p.email, p.full_name, p.status AS person_status
 			 FROM users u JOIN people p ON p.id = u.person_id
-			 WHERE u.id = ?`
+			 WHERE u.id = ? AND u.deleted_at IS NULL`
 		)
 		.get(id) ?? null;
 }
@@ -49,7 +49,7 @@ export function getUserByEmail(db, emailNormalized) {
 				`SELECT u.*, p.email, p.full_name, p.status AS person_status
 				 FROM users u
 				 JOIN people p ON p.id = u.person_id
-				 WHERE p.email = ?`
+				 WHERE p.email = ? AND u.deleted_at IS NULL`
 			)
 			.get(emailNormalized) ?? null
 	);
@@ -62,9 +62,11 @@ export function listUsers(db) {
 	return db
 		.prepare(
 			`SELECT u.id, u.person_id, u.role, u.must_change_password, u.created_at, u.updated_at,
-			        p.full_name, p.email, p.status AS person_status
+			        p.full_name, p.gender, p.birth_date, p.email, p.phone,
+			        p.status AS person_status
 			 FROM users u
 			 JOIN people p ON p.id = u.person_id
+			 WHERE u.deleted_at IS NULL
 			 ORDER BY p.full_name COLLATE NOCASE`
 		)
 		.all();
@@ -99,6 +101,38 @@ export function setTemporaryPassword(db, userId, passwordHash) {
  */
 export function setUserRole(db, userId, role) {
 	db.prepare(`UPDATE users SET role = ?, updated_at = ? WHERE id = ?`).run(role, nowIso(), userId);
+}
+
+/**
+ * Soft-delete a login account so historical records can retain their references.
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} userId
+ */
+export function softDeleteUser(db, userId) {
+	const deletedAt = nowIso();
+	const remove = db.transaction(() => {
+		db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+		db.prepare('UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ?').run(
+			deletedAt,
+			deletedAt,
+			userId
+		);
+	});
+	remove();
+}
+
+/**
+ * Restore a previously deleted login account with a new temporary password.
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} userId
+ * @param {{ passwordHash: string, role: string }} input
+ */
+export function restoreDeletedUser(db, userId, input) {
+	db.prepare(
+		`UPDATE users
+		 SET deleted_at = NULL, password_hash = ?, role = ?, must_change_password = 1, updated_at = ?
+		 WHERE id = ?`
+	).run(input.passwordHash, input.role, nowIso(), userId);
 }
 
 /**

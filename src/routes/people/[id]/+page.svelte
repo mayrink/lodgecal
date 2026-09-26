@@ -1,4 +1,5 @@
 <script>
+  import { sortableTable } from "$lib/sortable-table.js";
   import PersonForm from "$lib/components/PersonForm.svelte";
   import FamilyMembers from "$lib/components/FamilyMembers.svelte";
   import Icon from "$lib/components/Icon.svelte";
@@ -84,6 +85,7 @@
         household={data.household}
         currentPersonId={data.person.id}
         adminLinks={true}
+        olderFirst={true}
         removable={true}
         onRemove={openRemove}
       />
@@ -103,10 +105,11 @@
     >
   </div>
   <div class="table-wrap">
-    <table class="knowledge-table">
+    <table class="knowledge-table" use:sortableTable>
       <thead
         ><tr
-          ><th>Date</th><th>Information</th><th class="actions-column">Actions</th
+          ><th>Date</th><th>Information</th><th class="actions-column"
+            >Actions</th
           ></tr
         ></thead
       ><tbody>
@@ -248,8 +251,8 @@
     >
   </div>
   <p>
-    {selectedMember?.full_name} will be removed from this household. Their own
-    person record is not deleted.
+    {selectedMember?.full_name} will be removed from this household. Their own person
+    record is not deleted.
   </p>
   <form method="POST" action="?/endRelationship" class="modal-actions">
     <input type="hidden" name="csrf" value={data.csrf} /><input

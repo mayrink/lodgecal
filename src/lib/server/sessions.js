@@ -53,11 +53,15 @@ export function getSessionUser(db, sessionId) {
 			 FROM sessions s
 			 JOIN users u ON u.id = s.user_id
 			 JOIN people p ON p.id = u.person_id
-			 WHERE s.id = ?`
+			 WHERE s.id = ? AND u.deleted_at IS NULL`
 		)
 		.get(sessionId);
 
 	if (!row) return null;
+	if (row.person_status !== 'ACTIVE') {
+		db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+		return null;
+	}
 	if (new Date(row.expires_at).getTime() <= Date.now()) {
 		db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 		return null;
@@ -89,6 +93,14 @@ export function getSessionUser(db, sessionId) {
  */
 export function deleteSession(db, sessionId) {
 	db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} userId
+ */
+export function deleteUserSessions(db, userId) {
+	db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
 }
 
 /**
