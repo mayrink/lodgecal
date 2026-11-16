@@ -104,7 +104,7 @@ test('first-run setup, login, upcoming birthdays, family, brothers actions, and 
 	await dialog.locator('#confirm-brother-name').fill('Wrong Name');
 	await expect(deleteBtn).toBeDisabled();
 
-	await dialog.locator('#confirm-brother-name').fill(`Bro∴ ${updatedName}`);
+	await dialog.locator('#confirm-brother-name').fill(updatedName);
 	await expect(deleteBtn).toBeEnabled();
 	await deleteBtn.click();
 	await expect(row).toHaveCount(0);

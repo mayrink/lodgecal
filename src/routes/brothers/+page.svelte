@@ -56,7 +56,7 @@
 	}
 
 	const canConfirmDelete = $derived(
-		Boolean(deleteTarget && deleteTypedName.trim() === deleteTarget.name)
+		Boolean(deleteTarget && deleteTypedName.trim() === deleteTarget.fullName)
 	);
 </script>
 
@@ -366,14 +366,14 @@
 
 			<div>
 				<label for="confirm-brother-name">
-					Type <strong>{deleteTarget.name}</strong> to enable deletion:
+					Type <strong>{deleteTarget.fullName}</strong> to enable deletion:
 				</label>
 				<input
 					id="confirm-brother-name"
 					name="confirmName"
 					type="text"
 					bind:value={deleteTypedName}
-					placeholder={deleteTarget.name}
+					placeholder={deleteTarget.fullName}
 					autocomplete="off"
 					required
 				/>
