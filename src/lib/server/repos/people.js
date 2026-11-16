@@ -284,7 +284,8 @@ export function listBrothersDirectory(db, opts = {}) {
 		return db
 			.prepare(
 				`SELECT u.id AS user_id, u.role, p.id AS person_id, p.full_name, p.gender,
-				        p.birth_date, p.email, p.phone, p.status
+				        p.birth_date, p.email, p.phone, p.status,
+				        (SELECT COUNT(*) FROM household_memberships hm WHERE hm.user_id = u.id AND hm.ended_at IS NULL) AS family_count
 				 FROM users u
 				 JOIN people p ON p.id = u.person_id
 				 WHERE u.deleted_at IS NULL
@@ -295,7 +296,8 @@ export function listBrothersDirectory(db, opts = {}) {
 	return db
 		.prepare(
 			`SELECT u.id AS user_id, u.role, p.id AS person_id, p.full_name, p.gender,
-			        p.birth_date, p.email, p.phone, p.status
+			        p.birth_date, p.email, p.phone, p.status,
+			        (SELECT COUNT(*) FROM household_memberships hm WHERE hm.user_id = u.id AND hm.ended_at IS NULL) AS family_count
 			 FROM users u
 			 JOIN people p ON p.id = u.person_id
 			 WHERE u.deleted_at IS NULL AND p.status = 'ACTIVE'

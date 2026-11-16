@@ -16,11 +16,11 @@ import {
 	setPersonStatus
 } from './repos/people.js';
 import { hashPassword } from './passwords.js';
-import { insertUser } from './repos/users.js';
+import { insertUser, purgeBrotherAndFamily } from './repos/users.js';
 import { isLoginThrottled, GENERIC_LOGIN_FAILURE } from './auth.js';
 import { recordLoginAttempt } from './audit.js';
 import { LOGIN_MAX_FAILURES } from '$lib/constants.js';
-import { createEvent, getEventTypeByKey } from './events.js';
+import { createEvent, getEventTypeByKey, listEventTypes } from './events.js';
 import { dashboardData } from './upcoming.js';
 
 function tempDb() {
@@ -259,6 +259,60 @@ describe('household privacy', () => {
 
 		const adminList = listBrothersDirectory(db, { includeInactive: true });
 		expect(adminList.map((b) => b.full_name)).toEqual(['Active Brother', 'Sleeping Brother']);
+	});
+
+	it('purges brother, family members, and notes permanently on delete', async () => {
+		const db = tempDb();
+		const hash = await hashPassword('temporary-password-ok');
+		const broId = insertPerson(db, {
+			fullName: 'John Doe',
+			gender: 'MALE',
+			birthDate: '1975-03-10',
+			email: 'john@example.com',
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		const userId = insertUser(db, { personId: broId, passwordHash: hash, role: ROLES.USER });
+		const spouseId = insertPerson(db, {
+			fullName: 'Jane Doe',
+			gender: 'FEMALE',
+			birthDate: '1977-08-20',
+			email: null,
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		addHouseholdMember(db, userId, spouseId, RELATIONSHIPS.SPOUSE);
+		insertKnowledge(db, { personId: broId, body: 'Brother note', authorUserId: userId });
+		insertKnowledge(db, { personId: spouseId, body: 'Spouse note', authorUserId: userId });
+
+		const res = purgeBrotherAndFamily(db, userId);
+		expect(res.deletedPeopleCount).toBe(2);
+		expect(db.prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(userId).n).toBe(0);
+		expect(
+			db
+				.prepare('SELECT COUNT(*) AS n FROM people WHERE id IN (?, ?)')
+				.get(broId, spouseId).n
+		).toBe(0);
+		expect(
+			db
+				.prepare('SELECT COUNT(*) AS n FROM knowledge_entries WHERE person_id IN (?, ?)')
+				.get(broId, spouseId).n
+		).toBe(0);
+	});
+});
+
+describe('event category ordering', () => {
+	afterEach(() => closeDb());
+
+	it('orders Initiation, Elevation, Exaltation first and Other last', () => {
+		const db = tempDb();
+		const activeTypes = listEventTypes(db).filter((t) => !t.derived);
+		expect(activeTypes.slice(0, 3).map((t) => t.label)).toEqual([
+			'Initiation',
+			'Elevation',
+			'Exaltation'
+		]);
+		expect(activeTypes.at(-1).label).toBe('Other');
 	});
 });
 

@@ -1,11 +1,13 @@
 function sortableValue(cell) {
-	const value = cell.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-	if (!value) return { kind: 'empty', value: '' };
-	if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return { kind: 'date', value };
+	const raw = (cell.dataset?.sortValue ?? cell.textContent ?? '').replace(/\s+/g, ' ').trim();
+	if (!raw) return { kind: 'empty', value: '' };
+	if (/^\d{4}-\d{2}-\d{2}$/.test(raw) || /^\d{2}-\d{2}$/.test(raw)) {
+		return { kind: 'date', value: raw };
+	}
 
-	const numericValue = Number(value.replaceAll(',', ''));
-	if (value && Number.isFinite(numericValue)) return { kind: 'number', value: numericValue };
-	return { kind: 'text', value };
+	const numericValue = Number(raw.replaceAll(',', ''));
+	if (raw && Number.isFinite(numericValue)) return { kind: 'number', value: numericValue };
+	return { kind: 'text', value: raw };
 }
 
 function compareCells(left, right) {

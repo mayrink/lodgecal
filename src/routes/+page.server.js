@@ -1,3 +1,4 @@
+import { formatDateLongYear } from '$lib/dates.js';
 import { requireUser } from '$lib/server/auth.js';
 import { dashboardData } from '$lib/server/upcoming.js';
 
@@ -14,6 +15,7 @@ export function load({ locals }) {
 	return {
 		...dash,
 		isAdmin: user.role === 'ADMIN',
-		upcomingWeeks
+		upcomingWeeks,
+		untilFormatted: formatDateLongYear(dash.to)
 	};
 }

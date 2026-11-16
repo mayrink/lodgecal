@@ -51,10 +51,10 @@ import { getLodgeSettings, updateLodgeSettings } from '$lib/server/repos/setting
 import {
 	getUserById,
 	insertUser,
+	purgeBrotherAndFamily,
 	restoreDeletedUser,
 	setTemporaryPassword,
-	setUserRole,
-	softDeleteUser
+	setUserRole
 } from '$lib/server/repos/users.js';
 import { deleteUserSessions } from '$lib/server/sessions.js';
 import {
@@ -330,14 +330,14 @@ export const actions = {
 		if (user.id === admin.id) {
 			return fail(400, { error: 'You cannot delete your own account.' });
 		}
-		softDeleteUser(locals.db, userId);
+		const purged = purgeBrotherAndFamily(locals.db, userId);
 		recordAudit(locals.db, {
 			actorUserId: admin.id,
 			actorEmail: locals.person?.email,
 			action: 'user_delete',
 			entityType: 'user',
 			entityId: userId,
-			summary: `Deleted login account for ${user.email}`
+			summary: `Purged account and household for ${user.email} (${purged?.deletedPeopleCount ?? 1} records)`
 		});
 		return { saved: true };
 	},

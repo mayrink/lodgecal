@@ -4,18 +4,9 @@
 
 	let { data } = $props();
 
-	let selectedWeeks = $state(null);
 	let searchQuery = $state('');
 
-	const weeks = $derived(selectedWeeks ?? data.upcomingWeeks ?? 4);
-	const lookaheadOptions = $derived.by(() => {
-		const base = [4, 5, 6, 7, 8];
-		const def = data.upcomingWeeks ?? 4;
-		if (!base.includes(def)) {
-			return [...base, def].sort((a, b) => a - b);
-		}
-		return base;
-	});
+	const weeks = $derived(data.upcomingWeeks ?? 4);
 
 	const filteredBirthdays = $derived.by(() => {
 		const maxDays = weeks * 7;
@@ -88,20 +79,9 @@
 			</div>
 			<div class="lookahead-box">
 				<div class="lookahead-label">Look ahead</div>
-				<div class="segmented-group" role="group" aria-label="Weeks ahead">
-					{#each lookaheadOptions as opt}
-						<button
-							type="button"
-							class="seg-btn"
-							class:active={opt === weeks}
-							aria-pressed={opt === weeks}
-							onclick={() => (selectedWeeks = opt)}
-						>
-							{opt}
-						</button>
-					{/each}
+				<div class="lookahead-static">
+					<strong>{weeks} {weeks === 1 ? 'week' : 'weeks'}</strong>, until {data.untilFormatted}
 				</div>
-				<div class="lookahead-hint">weeks. The lodge sets the default ({data.upcomingWeeks}).</div>
 			</div>
 		</div>
 
@@ -294,46 +274,18 @@
 		margin-bottom: 0.375rem;
 	}
 
-	.segmented-group {
-		display: inline-flex;
+	.lookahead-static {
+		min-height: 2.875rem;
+		padding: 0 1rem;
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		overflow: hidden;
 		background: var(--surface);
-	}
-
-	.seg-btn {
-		min-width: 3rem;
-		min-height: 2.75rem;
-		padding: 0 0.75rem;
-		border: 0;
-		border-right: 1px solid var(--border);
-		border-radius: 0;
-		background: transparent;
 		color: var(--text);
 		font-size: 0.9375rem;
-		font-weight: 400;
-	}
-
-	.seg-btn:last-child {
-		border-right: 0;
-	}
-
-	.seg-btn:hover {
-		background: var(--tint);
-		color: var(--text);
-	}
-
-	.seg-btn.active {
-		background: var(--primary);
-		color: var(--on-primary);
-		font-weight: 600;
-	}
-
-	.lookahead-hint {
-		font-size: 0.75rem;
-		color: var(--text2);
-		margin-top: 0.375rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.groups-wrap {

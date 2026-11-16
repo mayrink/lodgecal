@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('first-run setup, login, upcoming birthdays, family, brothers, and admin', async ({ page }) => {
+test('first-run setup, login, upcoming birthdays, family, brothers actions, and admin', async ({ page }) => {
 	await page.goto('/setup');
 	const heading = page.locator('h1');
 	await expect(heading).toBeVisible();
@@ -39,26 +39,25 @@ test('first-run setup, login, upcoming birthdays, family, brothers, and admin', 
 	await expect(page.locator('h1')).toHaveText(/Upcoming birthdays/);
 	await expect(page.getByRole('heading', { name: 'Lodge events' })).toBeVisible();
 
-	// Look-ahead switcher on dashboard
-	const sixWeeksBtn = page.getByRole('group', { name: 'Weeks ahead' }).getByRole('button', { name: '6' });
-	await sixWeeksBtn.click();
-	await expect(sixWeeksBtn).toHaveAttribute('aria-pressed', 'true');
-	await expect(page.locator('.page-lead')).toContainText('Showing the next 6 weeks');
+	// Look-ahead static display on dashboard
+	await expect(page.locator('.lookahead-static')).toContainText(/weeks?, until /);
 
-	// Navigate to My family
-	await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My family' }).click();
-	await expect(page.locator('h1')).toHaveText('My family');
-	await expect(page.getByText('Notes for the birthday card').first()).toBeVisible();
-
-	// Navigate to Brothers directory
-	await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Brothers' }).click();
-	await expect(page.locator('h1')).toHaveText('Brothers');
-	await expect(page.getByText('Include sleeping brothers')).toBeVisible();
-
-	// Navigate to Admin
+	// Navigate to Admin and create a test brother + check Lodge events category order
 	await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Admin' }).click();
 	await expect(page.locator('h1')).toHaveText('Lodge administration');
 
+	// Check Lodge events tab category ordering and Repeats toggle
+	await page.getByRole('tab', { name: 'Lodge events' }).click();
+	await page.getByRole('button', { name: 'New event' }).click();
+	const options = await page.locator('#ev-type option').allInnerTexts();
+	expect(options.slice(0, 3)).toEqual(['Initiation', 'Elevation', 'Exaltation']);
+	expect(options.at(-1)).toBe('Other');
+	await expect(page.locator('#ev-repeats')).toBeDisabled();
+	await page.selectOption('#ev-type', { label: 'Other' });
+	await expect(page.locator('#ev-repeats')).toBeEnabled();
+
+	// Create a brother on Admin -> Brothers and families
+	await page.getByRole('tab', { name: 'Brothers and families' }).click();
 	const email = `e2e-user-${Date.now()}@example.com`;
 	const originalName = 'E2E Managed User';
 	const updatedName = 'E2E Updated User';
@@ -70,25 +69,43 @@ test('first-run setup, login, upcoming birthdays, family, brothers, and admin', 
 	await page.getByRole('button', { name: 'Create brother' }).click();
 	await expect(page.locator('.generated-password')).toContainText(email);
 
-	let brotherBlock = page.locator('.admin-brother-block').filter({ hasText: email });
-	await expect(brotherBlock).toBeVisible();
+	// Navigate to Brothers directory and test Sortable Table, Edit slide-in pane, Sleep toggle, View, and Purge Delete modal
+	await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Brothers' }).click();
+	await expect(page.locator('h1')).toHaveText('Brothers');
+	await expect(page.getByRole('button', { name: 'Sort by Name' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Sort by Birthday' })).toBeVisible();
 
-	// Edit brother
-	await brotherBlock.getByRole('button', { name: 'Edit' }).click();
-	await brotherBlock.getByLabel('Full name').fill(updatedName);
-	await brotherBlock.getByLabel('Role').selectOption('ADMIN');
-	await brotherBlock.getByRole('button', { name: 'Save brother' }).click();
-	brotherBlock = page.locator('.admin-brother-block').filter({ hasText: email });
-	await expect(brotherBlock).toContainText('Superadmin');
+	let row = page.locator('tbody tr').filter({ hasText: email });
+	await expect(row).toBeVisible();
 
-	// Mark sleeping and Reactivate
-	await brotherBlock.getByRole('button', { name: 'Mark sleeping' }).click();
-	await expect(brotherBlock).toContainText('Sleeping');
-	await brotherBlock.getByRole('button', { name: 'Reactivate' }).click();
-	await expect(brotherBlock.getByRole('button', { name: 'Mark sleeping' })).toBeVisible();
+	// Open slide-in Edit pane
+	await row.getByRole('button', { name: /Edit / }).click();
+	const pane = page.locator('aside.slide-pane');
+	await expect(pane).toBeVisible();
+	await pane.getByLabel('Full name').fill(updatedName);
+	await pane.getByRole('button', { name: 'Save changes' }).click();
+	await expect(pane).toHaveCount(0);
 
-	// Delete brother
-	await brotherBlock.getByRole('button', { name: 'Delete' }).click();
-	await brotherBlock.getByRole('button', { name: 'Delete permanently' }).click();
-	await expect(brotherBlock).toHaveCount(0);
+	row = page.locator('tbody tr').filter({ hasText: email });
+	await expect(row).toContainText(updatedName);
+
+	// Toggle Sleep on and off
+	await row.getByRole('button', { name: /Mark .* as sleeping/ }).click();
+	await expect(row).toContainText('Sleeping');
+	await row.getByRole('button', { name: /wake from sleep/ }).click();
+
+	// Purge Delete modal requiring exact name match
+	await row.getByRole('button', { name: /Delete / }).click();
+	const dialog = page.locator('dialog.purge-modal');
+	await expect(dialog).toBeVisible();
+	const deleteBtn = dialog.getByRole('button', { name: 'Delete permanently' });
+	await expect(deleteBtn).toBeDisabled();
+
+	await dialog.locator('#confirm-brother-name').fill('Wrong Name');
+	await expect(deleteBtn).toBeDisabled();
+
+	await dialog.locator('#confirm-brother-name').fill(`Bro∴ ${updatedName}`);
+	await expect(deleteBtn).toBeEnabled();
+	await deleteBtn.click();
+	await expect(row).toHaveCount(0);
 });

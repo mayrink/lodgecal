@@ -793,15 +793,16 @@
 						</div>
 						<div class="f-col-1">
 							<label class="muted-label" for="ev-repeats">Repeats</label>
-							{#if canNewEventRecur}
-								<select id="ev-repeats" name="repeats">
-									<option value="once">One time</option>
-									<option value="annual">Every year</option>
-								</select>
-							{:else}
-								<input type="hidden" name="repeats" value="once" />
-								<input type="text" value="One time (milestone)" disabled />
-							{/if}
+							<label class="toggle-switch" for="ev-repeats">
+								<input
+									id="ev-repeats"
+									type="checkbox"
+									name="recurring"
+									disabled={!canNewEventRecur}
+									checked={false}
+								/>
+								<span>{canNewEventRecur ? 'Repeats yearly' : 'One-time milestone'}</span>
+							</label>
 						</div>
 						<div class="f-col-1">
 							<label class="muted-label" for="ev-person">Related person (optional)</label>
@@ -922,19 +923,20 @@
 										</div>
 										<div class="f-col-1">
 											<label class="muted-label" for="ed-ev-rep-{ev.id}">Repeats</label>
-											{#if editType?.allows_recurrence}
-												<select
+											<label class="toggle-switch" for="ed-ev-rep-{ev.id}">
+												<input
 													id="ed-ev-rep-{ev.id}"
-													name="repeats"
-													value={ev.recurringBool ? 'annual' : 'once'}
+													type="checkbox"
+													name="recurring"
+													disabled={!editType?.allows_recurrence}
+													checked={Boolean(editType?.allows_recurrence && ev.recurringBool)}
+												/>
+												<span
+													>{editType?.allows_recurrence
+														? 'Repeats yearly'
+														: 'One-time milestone'}</span
 												>
-													<option value="once">One time</option>
-													<option value="annual">Every year</option>
-												</select>
-											{:else}
-												<input type="hidden" name="repeats" value="once" />
-												<input type="text" value="One time (milestone)" disabled />
-											{/if}
+											</label>
 										</div>
 										<div class="f-col-1">
 											<label class="muted-label" for="ed-ev-person-{ev.id}"
@@ -993,7 +995,7 @@
 						<h3>Event categories</h3>
 						<p class="muted" style="margin:0.25rem 0 1rem;font-size:0.875rem">
 							System categories (Initiation, Elevation, Exaltation, Wedding anniversary, Lodge
-							anniversary, General event) are built in. You can add custom categories for your
+							anniversary, Other) are built in. You can add custom categories for your
 							lodge below.
 						</p>
 						<div class="categories-chips">

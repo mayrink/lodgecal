@@ -137,12 +137,12 @@ function ensureLodgeSettingsRow(db) {
 
 const SYSTEM_EVENT_TYPES = [
 	{ key: 'birthday', label: 'Birthday', allows: 0, derived: 1 },
-	{ key: 'wedding_anniversary', label: 'Wedding anniversary', allows: 1, derived: 0 },
-	{ key: 'lodge_anniversary', label: 'Lodge anniversary', allows: 1, derived: 0 },
 	{ key: 'initiation', label: 'Initiation', allows: 0, derived: 0 },
 	{ key: 'elevation', label: 'Elevation', allows: 0, derived: 0 },
 	{ key: 'exaltation', label: 'Exaltation', allows: 0, derived: 0 },
-	{ key: 'general', label: 'General event', allows: 1, derived: 0 }
+	{ key: 'wedding_anniversary', label: 'Wedding anniversary', allows: 1, derived: 0 },
+	{ key: 'lodge_anniversary', label: 'Lodge anniversary', allows: 1, derived: 0 },
+	{ key: 'general', label: 'Other', allows: 1, derived: 0 }
 ];
 
 /**

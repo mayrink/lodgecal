@@ -1,37 +1,97 @@
 import { error, fail } from '@sveltejs/kit';
-import { RELATIONSHIPS } from '$lib/constants.js';
-import { ageOn } from '$lib/dates.js';
-import { plainDate, today } from '$lib/dates.js';
+import { PERSON_STATUS, RELATIONSHIPS } from '$lib/constants.js';
+import {
+	ageOn,
+	formatDateShortYear,
+	formatDayMonthLong,
+	plainDate,
+	today
+} from '$lib/dates.js';
+import { childLabel, honorificName } from '$lib/display.js';
 import { recordAudit, summarizeChange } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
-import { correctKnowledge, getKnowledgeById, insertKnowledge, listKnowledge, retireKnowledge } from '$lib/server/repos/knowledge.js';
+import {
+	correctKnowledge,
+	getKnowledgeById,
+	insertKnowledge,
+	listKnowledge,
+	retireKnowledge
+} from '$lib/server/repos/knowledge.js';
 import {
 	addHouseholdMember,
 	endHouseholdMembership,
 	getHouseholdForPerson,
 	getPersonById,
+	insertPerson,
 	listHouseholdHeads,
 	setPersonStatus,
 	updatePerson
 } from '$lib/server/repos/people.js';
 import { asString, validatePersonInput } from '$lib/server/validation.js';
 
+function formatNotes(entries) {
+	return entries.map((e) => ({
+		...e,
+		effectiveDate: e.effective_date,
+		dateFormatted: formatDateShortYear(e.effective_date)
+	}));
+}
+
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals, params }) {
 	requireAdmin(locals);
 	const person = getPersonById(locals.db, Number(params.id));
 	if (!person) error(404, 'Person not found.');
-	const userRow = locals.db.prepare('SELECT * FROM users WHERE person_id = ?').get(person.id);
-	const household = getHouseholdForPerson(locals.db, person.id);
+	const terminology = locals.lodge?.terminology ?? {};
+	const userRow = locals.db
+		.prepare('SELECT * FROM users WHERE person_id = ? AND deleted_at IS NULL')
+		.get(person.id);
+	const rawHousehold = getHouseholdForPerson(locals.db, person.id);
+
+	const householdMembers = [];
+	if (rawHousehold) {
+		if (rawHousehold.spouse && rawHousehold.spouse.id !== person.id) {
+			householdMembers.push({
+				...rawHousehold.spouse,
+				relationship: 'SPOUSE',
+				relLabel:
+					rawHousehold.spouse.gender === 'FEMALE'
+						? 'Wife'
+						: rawHousehold.spouse.gender === 'MALE'
+							? 'Husband'
+							: terminology.spouse || 'Spouse',
+				age: ageOn(rawHousehold.spouse.birth_date),
+				birthdayFormatted: formatDayMonthLong(rawHousehold.spouse.birth_date),
+				notes: formatNotes(listKnowledge(locals.db, rawHousehold.spouse.id))
+			});
+		}
+		for (const child of rawHousehold.children ?? []) {
+			if (child.id === person.id) continue;
+			householdMembers.push({
+				...child,
+				relationship: 'CHILD',
+				relLabel: childLabel(child, terminology),
+				age: ageOn(child.birth_date),
+				birthdayFormatted: formatDayMonthLong(child.birth_date),
+				notes: formatNotes(listKnowledge(locals.db, child.id))
+			});
+		}
+	}
+
 	return {
 		csrf: locals.csrf,
-		person,
+		person: {
+			...person,
+			displayName: userRow ? honorificName(person, terminology) : person.full_name,
+			birthdayFormatted: formatDayMonthLong(person.birth_date)
+		},
 		age: ageOn(person.birth_date),
 		today: today().toString(),
 		userRow,
-		household,
-		knowledge: listKnowledge(locals.db, person.id, { includeRetired: true }),
+		household: rawHousehold,
+		householdMembers,
+		knowledge: formatNotes(listKnowledge(locals.db, person.id, { includeRetired: false })),
 		heads: listHouseholdHeads(locals.db)
 	};
 }
@@ -48,7 +108,7 @@ export const actions = {
 		if (!before) error(404, 'Person not found.');
 		const parsed = validatePersonInput({
 			fullName: form.get('fullName'),
-			gender: form.get('gender'),
+			gender: form.get('gender') || before.gender,
 			birthDate: form.get('birthDate'),
 			email: form.get('email'),
 			phone: form.get('phone'),
@@ -67,23 +127,56 @@ export const actions = {
 		return { saved: true };
 	},
 
-	status: async ({ request, locals, params }) => {
+	addFamilyMember: async ({ request, locals, params }) => {
 		const admin = requireAdmin(locals);
 		const form = await request.formData();
 		const csrf = csrfError(form, locals);
 		if (csrf) return fail(403, { error: csrf });
-		const status = asString(form.get('status')).toUpperCase();
-		const id = Number(params.id);
-		const before = getPersonById(locals.db, id);
-		if (!before) error(404, 'Person not found.');
-		setPersonStatus(locals.db, id, status);
+		const personId = Number(params.id);
+		const userRow = locals.db
+			.prepare('SELECT id FROM users WHERE person_id = ? AND deleted_at IS NULL')
+			.get(personId);
+		if (!userRow) return fail(400, { error: 'Only a Lodge Brother can head a household.' });
+
+		const relationChoice = asString(form.get('relationChoice') || 'Wife');
+		let relationship = RELATIONSHIPS.CHILD;
+		let gender = asString(form.get('gender')).toUpperCase();
+		if (relationChoice === 'Wife') {
+			relationship = RELATIONSHIPS.SPOUSE;
+			if (!gender) gender = 'FEMALE';
+		} else if (relationChoice === 'Husband' || relationChoice === 'Spouse') {
+			relationship = RELATIONSHIPS.SPOUSE;
+			if (!gender) gender = relationChoice === 'Husband' ? 'MALE' : 'OTHER';
+		} else if (relationChoice === 'Son') {
+			relationship = RELATIONSHIPS.CHILD;
+			if (!gender) gender = 'MALE';
+		} else if (relationChoice === 'Daughter') {
+			relationship = RELATIONSHIPS.CHILD;
+			if (!gender) gender = 'FEMALE';
+		} else {
+			relationship = RELATIONSHIPS.CHILD;
+			if (!gender) gender = 'OTHER';
+		}
+
+		const parsed = validatePersonInput({
+			fullName: form.get('fullName'),
+			gender,
+			birthDate: form.get('birthDate'),
+			email: form.get('email'),
+			phone: form.get('phone'),
+			status: PERSON_STATUS.ACTIVE
+		});
+		if (!parsed.ok) return fail(400, { error: parsed.error });
+		const newId = insertPerson(locals.db, parsed.value);
+		const attached = addHouseholdMember(locals.db, userRow.id, newId, relationship);
+		if (!attached.ok) return fail(400, { error: attached.error });
 		recordAudit(locals.db, {
 			actorUserId: admin.id,
 			actorEmail: locals.person?.email,
-			action: 'person_status',
+			action: 'household_member_create',
 			entityType: 'person',
-			entityId: id,
-			summary: `status: ${before.status} -> ${status}`
+			entityId: newId,
+			summary: `Added ${relationship.toLowerCase()} ${parsed.value.fullName}`
 		});
 		return { saved: true };
 	},
@@ -107,40 +200,22 @@ export const actions = {
 		return { saved: true };
 	},
 
-	attach: async ({ request, locals, params }) => {
-		const admin = requireAdmin(locals);
-		const form = await request.formData();
-		const csrf = csrfError(form, locals);
-		if (csrf) return fail(403, { error: csrf });
-		const userId = Number(asString(form.get('householdUserId')));
-		const relationship = asString(form.get('relationship')).toUpperCase();
-		if (!userId || (relationship !== RELATIONSHIPS.SPOUSE && relationship !== RELATIONSHIPS.CHILD)) {
-			return fail(400, { error: 'Household and relationship are required.' });
-		}
-		const result = addHouseholdMember(locals.db, userId, Number(params.id), relationship);
-		if (!result.ok) return fail(400, { error: result.error });
-		recordAudit(locals.db, {
-			actorUserId: admin.id,
-			actorEmail: locals.person?.email,
-			action: 'relationship_add',
-			entityType: 'household_membership',
-			entityId: params.id,
-			summary: `Attached as ${relationship} to user ${userId}`
-		});
-		return { saved: true };
-	},
-
 	addKnowledge: async ({ request, locals, params }) => {
 		const admin = requireAdmin(locals);
 		const form = await request.formData();
 		const csrf = csrfError(form, locals);
 		if (csrf) return fail(403, { error: csrf });
+		const targetPersonId = Number(asString(form.get('personId')) || params.id);
 		const body = asString(form.get('body'));
-		const effectiveDate = asString(form.get('effectiveDate'));
+		const effectiveDate = asString(form.get('effectiveDate')) || today().toString();
 		if (!body) return fail(400, { error: 'Knowledge text is required.' });
-		try { plainDate(effectiveDate); } catch { return fail(400, { error: 'A valid date is required.' }); }
+		try {
+			plainDate(effectiveDate);
+		} catch {
+			return fail(400, { error: 'A valid date is required.' });
+		}
 		const id = insertKnowledge(locals.db, {
-			personId: Number(params.id),
+			personId: targetPersonId,
 			body,
 			effectiveDate,
 			authorUserId: admin.id
@@ -151,7 +226,7 @@ export const actions = {
 			action: 'knowledge_create',
 			entityType: 'knowledge',
 			entityId: id,
-			summary: `Admin added knowledge for person ${params.id}`
+			summary: `Admin added knowledge for person ${targetPersonId}`
 		});
 		return { saved: true };
 	},
@@ -174,7 +249,7 @@ export const actions = {
 		return { saved: true };
 	},
 
-	editKnowledge: async ({ request, locals, params }) => {
+	editKnowledge: async ({ request, locals }) => {
 		const admin = requireAdmin(locals);
 		const form = await request.formData();
 		const csrf = csrfError(form, locals);
@@ -183,38 +258,24 @@ export const actions = {
 		const body = asString(form.get('body'));
 		const effectiveDate = asString(form.get('effectiveDate'));
 		const entry = getKnowledgeById(locals.db, id);
-		if (!entry || entry.person_id !== Number(params.id)) return fail(404, { error: 'Knowledge entry not found.' });
+		if (!entry) return fail(404, { error: 'Knowledge entry not found.' });
 		if (!body) return fail(400, { error: 'Knowledge text is required.' });
-		try { plainDate(effectiveDate); } catch { return fail(400, { error: 'A valid date is required.' }); }
+		try {
+			plainDate(effectiveDate);
+		} catch {
+			return fail(400, { error: 'A valid date is required.' });
+		}
 		correctKnowledge(locals.db, id, body, effectiveDate);
-		recordAudit(locals.db, {
-			actorUserId: admin.id,
-			actorEmail: locals.person?.email,
-			action: 'knowledge_update',
-			entityType: 'knowledge',
-			entityId: id,
-			summary: `Updated knowledge for person ${params.id}`
-		});
 		return { saved: true };
 	},
 
-	deleteKnowledge: async ({ request, locals, params }) => {
+	deleteKnowledge: async ({ request, locals }) => {
 		const admin = requireAdmin(locals);
 		const form = await request.formData();
 		const csrf = csrfError(form, locals);
 		if (csrf) return fail(403, { error: csrf });
 		const id = Number(asString(form.get('knowledgeId')));
-		const entry = getKnowledgeById(locals.db, id);
-		if (!entry || entry.person_id !== Number(params.id)) return fail(404, { error: 'Knowledge entry not found.' });
 		retireKnowledge(locals.db, id);
-		recordAudit(locals.db, {
-			actorUserId: admin.id,
-			actorEmail: locals.person?.email,
-			action: 'knowledge_retire',
-			entityType: 'knowledge',
-			entityId: id,
-			summary: `Retired knowledge for person ${params.id}`
-		});
 		return { saved: true };
 	}
 };

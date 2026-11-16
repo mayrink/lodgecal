@@ -78,5 +78,19 @@ export function createEvent(db, input) {
  * @param {import('better-sqlite3').Database} db
  */
 export function listEventTypes(db) {
-	return db.prepare('SELECT * FROM event_types ORDER BY label COLLATE NOCASE').all();
+	return db
+		.prepare(
+			`SELECT * FROM event_types
+			 ORDER BY
+				CASE key
+					WHEN 'initiation' THEN 1
+					WHEN 'elevation' THEN 2
+					WHEN 'exaltation' THEN 3
+					WHEN 'general' THEN 999
+					WHEN 'other' THEN 999
+					ELSE 10
+				END,
+				label COLLATE NOCASE`
+		)
+		.all();
 }
