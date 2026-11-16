@@ -1,5 +1,5 @@
-import { error, fail } from '@sveltejs/kit';
-import { plainDate, today } from '$lib/dates.js';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { plainDate } from '$lib/dates.js';
 import { recordAudit, summarizeChange } from '$lib/server/audit.js';
 import { requireUser } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
@@ -7,12 +7,10 @@ import {
 	correctKnowledge,
 	getKnowledgeById,
 	insertKnowledge,
-	listKnowledge,
 	retireKnowledge
 } from '$lib/server/repos/knowledge.js';
 import {
 	canAccessPerson,
-	getHouseholdForPerson,
 	getPersonById,
 	personHasUserAccount,
 	updatePerson
@@ -37,14 +35,7 @@ export function load({ locals, params }) {
 	const { id } = assertAccess(locals, params);
 	const person = getPersonById(locals.db, id);
 	if (!person) error(404, 'Person not found.');
-	return {
-		csrf: locals.csrf,
-		person,
-		today: today().toString(),
-		household: getHouseholdForPerson(locals.db, id),
-		currentPersonId: id,
-		knowledge: listKnowledge(locals.db, id, { includeRetired: true })
-	};
+	redirect(303, `/family#person-${id}`);
 }
 
 /** @type {import('./$types').Actions} */

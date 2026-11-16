@@ -11,7 +11,9 @@ import {
 	getActiveSpouse,
 	householdPersonIds,
 	insertPerson,
-	personHasUserAccount
+	listBrothersDirectory,
+	personHasUserAccount,
+	setPersonStatus
 } from './repos/people.js';
 import { hashPassword } from './passwords.js';
 import { insertUser } from './repos/users.js';
@@ -137,6 +139,126 @@ describe('household privacy', () => {
 			isAdmin: true
 		});
 		expect(dashAdmin.adminInactive.some((i) => i.title === 'Departed')).toBe(true);
+	});
+
+	it('shows Turns X (age) and notes only to Admin or for a Brother’s own spouse and children', async () => {
+		const db = tempDb();
+		const hash = await hashPassword('temporary-password-ok');
+		const broA = insertPerson(db, {
+			fullName: 'Paulo Moreira',
+			gender: 'MALE',
+			birthDate: '1980-06-10',
+			email: 'paulo@example.com',
+			phone: '111-222',
+			status: PERSON_STATUS.ACTIVE
+		});
+		const userA = insertUser(db, { personId: broA, passwordHash: hash, role: ROLES.USER });
+		const childA = insertPerson(db, {
+			fullName: 'Isadora Moreira',
+			gender: 'FEMALE',
+			birthDate: '2012-06-15',
+			email: null,
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		addHouseholdMember(db, userA, childA, RELATIONSHIPS.CHILD);
+		insertKnowledge(db, {
+			personId: childA,
+			body: 'Draws manga',
+			authorUserId: userA,
+			effectiveDate: '2026-09-01'
+		});
+
+		const broB = insertPerson(db, {
+			fullName: 'Henrique Almeida',
+			gender: 'MALE',
+			birthDate: '1978-07-10',
+			email: 'henrique@example.com',
+			phone: '999-888',
+			status: PERSON_STATUS.ACTIVE
+		});
+		const userB = insertUser(db, { personId: broB, passwordHash: hash, role: ROLES.USER });
+		const childB = insertPerson(db, {
+			fullName: 'Beatriz Almeida',
+			gender: 'FEMALE',
+			birthDate: '2008-07-12',
+			email: null,
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		addHouseholdMember(db, userB, childB, RELATIONSHIPS.CHILD);
+		insertKnowledge(db, {
+			personId: childB,
+			body: 'Studies veterinary medicine',
+			authorUserId: userB,
+			effectiveDate: '2026-09-01'
+		});
+
+		// View as Brother A (regular USER)
+		const dashForA = dashboardData(db, {
+			upcomingWeeks: 52,
+			terminology: {},
+			isAdmin: false,
+			viewerPersonId: broA
+		});
+		const ownChildRow = dashForA.upcoming.find((i) => i.personId === childA);
+		const otherChildRow = dashForA.upcoming.find((i) => i.personId === childB);
+		const otherBroRow = dashForA.upcoming.find((i) => i.personId === broB);
+
+		expect(ownChildRow.turns).toMatch(/^Turns \d+$/);
+		expect(ownChildRow.canSee).toBe(true);
+		expect(ownChildRow.trivia.map((t) => t.body)).toEqual(['Draws manga']);
+
+		expect(otherChildRow.turns).toBeNull();
+		expect(otherChildRow.canSee).toBe(false);
+		expect(otherChildRow.locked).toBe(true);
+		expect(otherChildRow.trivia).toEqual([]);
+
+		expect(otherBroRow.turns).toBeNull();
+		expect(otherBroRow.canSee).toBe(false);
+
+		// View as Admin
+		const dashForAdmin = dashboardData(db, {
+			upcomingWeeks: 52,
+			terminology: {},
+			isAdmin: true,
+			viewerPersonId: broA
+		});
+		const adminOtherChild = dashForAdmin.upcoming.find((i) => i.personId === childB);
+		expect(adminOtherChild.turns).toMatch(/^Turns \d+$/);
+		expect(adminOtherChild.canSee).toBe(true);
+		expect(adminOtherChild.trivia.map((t) => t.body)).toEqual(['Studies veterinary medicine']);
+	});
+
+	it('excludes sleeping brothers from regular Brothers directory query', async () => {
+		const db = tempDb();
+		const hash = await hashPassword('temporary-password-ok');
+		const activeP = insertPerson(db, {
+			fullName: 'Active Brother',
+			gender: 'MALE',
+			birthDate: '1980-01-01',
+			email: 'active@example.com',
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		insertUser(db, { personId: activeP, passwordHash: hash, role: ROLES.USER });
+
+		const sleepingP = insertPerson(db, {
+			fullName: 'Sleeping Brother',
+			gender: 'MALE',
+			birthDate: '1975-01-01',
+			email: 'sleep@example.com',
+			phone: null,
+			status: PERSON_STATUS.INACTIVE
+		});
+		insertUser(db, { personId: sleepingP, passwordHash: hash, role: ROLES.USER });
+		setPersonStatus(db, sleepingP, PERSON_STATUS.INACTIVE);
+
+		const regularList = listBrothersDirectory(db, { includeInactive: false });
+		expect(regularList.map((b) => b.full_name)).toEqual(['Active Brother']);
+
+		const adminList = listBrothersDirectory(db, { includeInactive: true });
+		expect(adminList.map((b) => b.full_name)).toEqual(['Active Brother', 'Sleeping Brother']);
 	});
 });
 

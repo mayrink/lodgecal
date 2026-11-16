@@ -88,7 +88,7 @@ export function countActiveBrothers(db) {
 			`SELECT COUNT(*) AS n
 			 FROM users u
 			 JOIN people p ON p.id = u.person_id
-			 WHERE p.status = 'ACTIVE'`
+			 WHERE p.status = 'ACTIVE' AND u.deleted_at IS NULL`
 		)
 		.get().n;
 }
@@ -110,7 +110,7 @@ export function getHousehold(db, userId) {
 		.prepare(
 			`SELECT u.id AS user_id, u.role, p.*
 			 FROM users u JOIN people p ON p.id = u.person_id
-			 WHERE u.id = ?`
+			 WHERE u.id = ? AND u.deleted_at IS NULL`
 		)
 		.get(userId);
 	if (!user) return null;
@@ -118,7 +118,7 @@ export function getHousehold(db, userId) {
 	const members = db
 		.prepare(
 			`SELECT hm.id AS membership_id, hm.relationship, hm.ended_at, p.*,
-			        EXISTS(SELECT 1 FROM users u2 WHERE u2.person_id = p.id) AS has_account
+			        EXISTS(SELECT 1 FROM users u2 WHERE u2.person_id = p.id AND u2.deleted_at IS NULL) AS has_account
 			 FROM household_memberships hm
 			 JOIN people p ON p.id = hm.person_id
 			 WHERE hm.user_id = ? AND hm.ended_at IS NULL
@@ -143,11 +143,12 @@ export function getHouseholdForPerson(db, personId) {
 		.prepare(
 			`SELECT u.id
 			 FROM users u
-			 WHERE u.person_id = ?
+			 WHERE u.person_id = ? AND u.deleted_at IS NULL
 			 UNION
 			SELECT hm.user_id
 			 FROM household_memberships hm
-			 WHERE hm.person_id = ? AND hm.ended_at IS NULL
+			 JOIN users u2 ON u2.id = hm.user_id
+			 WHERE hm.person_id = ? AND hm.ended_at IS NULL AND u2.deleted_at IS NULL
 			 LIMIT 1`
 		)
 		.get(personId, personId);
@@ -239,7 +240,9 @@ export function canAccessPerson(db, user, personId) {
  * @param {number} personId
  */
 export function personHasUserAccount(db, personId) {
-	return Boolean(db.prepare('SELECT id FROM users WHERE person_id = ?').get(personId));
+	return Boolean(
+		db.prepare('SELECT id FROM users WHERE person_id = ? AND deleted_at IS NULL').get(personId)
+	);
 }
 
 /**
@@ -264,7 +267,103 @@ export function listHouseholdHeads(db) {
 		.prepare(
 			`SELECT u.id AS user_id, p.id AS person_id, p.full_name, p.email
 			 FROM users u JOIN people p ON p.id = u.person_id
+			 WHERE u.deleted_at IS NULL
 			 ORDER BY p.full_name COLLATE NOCASE`
 		)
 		.all();
+}
+
+/**
+ * Brothers directory list.
+ * Regular users only ever receive ACTIVE brothers.
+ * @param {import('better-sqlite3').Database} db
+ * @param {{ includeInactive?: boolean }} [opts]
+ */
+export function listBrothersDirectory(db, opts = {}) {
+	if (opts.includeInactive) {
+		return db
+			.prepare(
+				`SELECT u.id AS user_id, u.role, p.id AS person_id, p.full_name, p.gender,
+				        p.birth_date, p.email, p.phone, p.status
+				 FROM users u
+				 JOIN people p ON p.id = u.person_id
+				 WHERE u.deleted_at IS NULL
+				 ORDER BY p.full_name COLLATE NOCASE`
+			)
+			.all();
+	}
+	return db
+		.prepare(
+			`SELECT u.id AS user_id, u.role, p.id AS person_id, p.full_name, p.gender,
+			        p.birth_date, p.email, p.phone, p.status
+			 FROM users u
+			 JOIN people p ON p.id = u.person_id
+			 WHERE u.deleted_at IS NULL AND p.status = 'ACTIVE'
+			 ORDER BY p.full_name COLLATE NOCASE`
+		)
+		.all();
+}
+
+/**
+ * Full admin list of brothers, their active household members, and active dated knowledge.
+ * @param {import('better-sqlite3').Database} db
+ */
+export function listAdminBrothersWithFamilies(db) {
+	const brothers = db
+		.prepare(
+			`SELECT u.id AS user_id, u.person_id, u.role, u.must_change_password,
+			        p.full_name, p.gender, p.birth_date, p.email, p.phone, p.status AS person_status
+			 FROM users u
+			 JOIN people p ON p.id = u.person_id
+			 WHERE u.deleted_at IS NULL
+			 ORDER BY p.full_name COLLATE NOCASE`
+		)
+		.all();
+
+	const memberships = db
+		.prepare(
+			`SELECT hm.id AS membership_id, hm.user_id, hm.person_id, hm.relationship,
+			        p.full_name, p.gender, p.birth_date, p.email, p.phone, p.status,
+			        EXISTS(SELECT 1 FROM users u2 WHERE u2.person_id = p.id AND u2.deleted_at IS NULL) AS has_account
+			 FROM household_memberships hm
+			 JOIN people p ON p.id = hm.person_id
+			 WHERE hm.ended_at IS NULL
+			 ORDER BY hm.relationship DESC, p.birth_date ASC, p.full_name COLLATE NOCASE`
+		)
+		.all();
+
+	const knowledgeRows = db
+		.prepare(
+			`SELECT k.id, k.person_id, k.body, k.effective_date, k.retired, p.full_name AS author_name
+			 FROM knowledge_entries k
+			 JOIN users u ON u.id = k.author_user_id
+			 JOIN people p ON p.id = u.person_id
+			 WHERE k.retired = 0
+			 ORDER BY k.effective_date DESC, k.created_at DESC`
+		)
+		.all();
+
+	const knowledgeByPerson = new Map();
+	for (const row of knowledgeRows) {
+		const list = knowledgeByPerson.get(row.person_id) ?? [];
+		list.push(row);
+		knowledgeByPerson.set(row.person_id, list);
+	}
+
+	const familyByUser = new Map();
+	for (const m of memberships) {
+		const list = familyByUser.get(m.user_id) ?? [];
+		list.push({
+			...m,
+			hasAccount: Boolean(m.has_account),
+			knowledge: knowledgeByPerson.get(m.person_id) ?? []
+		});
+		familyByUser.set(m.user_id, list);
+	}
+
+	return brothers.map((b) => ({
+		...b,
+		knowledge: knowledgeByPerson.get(b.person_id) ?? [],
+		family: familyByUser.get(b.user_id) ?? []
+	}));
 }

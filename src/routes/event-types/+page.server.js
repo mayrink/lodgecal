@@ -1,7 +1,6 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { recordAudit } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
-import { listEventTypes } from '$lib/server/events.js';
 import { csrfError, slugKey } from '$lib/server/forms.js';
 import { insertEventType, setEventTypeActive, updateEventType } from '$lib/server/repos/events.js';
 import { asString } from '$lib/server/validation.js';
@@ -9,7 +8,7 @@ import { asString } from '$lib/server/validation.js';
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals }) {
 	requireAdmin(locals);
-	return { csrf: locals.csrf, types: listEventTypes(locals.db) };
+	redirect(303, '/admin?tab=events');
 }
 
 /** @type {import('./$types').Actions} */

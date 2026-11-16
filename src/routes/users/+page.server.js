@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { PERSON_STATUS, ROLES } from '$lib/constants.js';
 import { recordAudit } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
@@ -8,7 +8,6 @@ import { getPersonByEmail, insertPerson, setPersonStatus, updatePerson } from '$
 import {
 	getUserById,
 	insertUser,
-	listUsers,
 	restoreDeletedUser,
 	softDeleteUser,
 	setTemporaryPassword,
@@ -40,7 +39,7 @@ function validateAccountEmail(parsed) {
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals }) {
 	requireAdmin(locals);
-	return { csrf: locals.csrf, users: listUsers(locals.db), generatedPassword: null };
+	redirect(303, '/admin?tab=members');
 }
 
 /** @type {import('./$types').Actions} */

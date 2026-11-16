@@ -10,6 +10,8 @@
 build/
 dist/
 other/
+test-results/
+playwright-report/
 
 # ----------------------------------------------------------------------------
 # Environment files

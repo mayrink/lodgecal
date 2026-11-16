@@ -1,20 +1,16 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { recordAudit } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
-import { createEvent, getEventType, listEventTypes } from '$lib/server/events.js';
+import { createEvent, getEventType } from '$lib/server/events.js';
 import { csrfError } from '$lib/server/forms.js';
-import { archiveEvent, listEvents, reactivateEvent, updateEvent } from '$lib/server/repos/events.js';
+import { archiveEvent, reactivateEvent, updateEvent } from '$lib/server/repos/events.js';
 import { asString } from '$lib/server/validation.js';
 import { isValidIsoDate } from '$lib/dates.js';
 
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals }) {
 	requireAdmin(locals);
-	return {
-		csrf: locals.csrf,
-		events: listEvents(locals.db),
-		types: listEventTypes(locals.db).filter((t) => !t.derived && t.is_active)
-	};
+	redirect(303, '/admin?tab=events');
 }
 
 function readEventForm(form) {

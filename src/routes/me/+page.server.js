@@ -1,14 +1,12 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { PERSON_STATUS, RELATIONSHIPS } from '$lib/constants.js';
-import { ageOn } from '$lib/dates.js';
-import { plainDate, today } from '$lib/dates.js';
+import { plainDate } from '$lib/dates.js';
 import { recordAudit, summarizeChange } from '$lib/server/audit.js';
 import { requireUser } from '$lib/server/auth.js';
 import { csrfError } from '$lib/server/forms.js';
-import { correctKnowledge, getKnowledgeById, insertKnowledge, listKnowledge, retireKnowledge } from '$lib/server/repos/knowledge.js';
+import { correctKnowledge, getKnowledgeById, insertKnowledge, retireKnowledge } from '$lib/server/repos/knowledge.js';
 import {
 	addHouseholdMember,
-	getHousehold,
 	getPersonById,
 	insertPerson,
 	updatePerson
@@ -18,16 +16,7 @@ import { asString, validatePersonInput } from '$lib/server/validation.js';
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals }) {
 	const user = requireUser(locals);
-	const person = getPersonById(locals.db, user.personId);
-	return {
-		csrf: locals.csrf,
-		person,
-		household: getHousehold(locals.db, user.id),
-		isAdmin: user.role === 'ADMIN',
-		age: user.role === 'ADMIN' ? ageOn(person.birth_date) : null,
-		today: today().toString(),
-		knowledge: listKnowledge(locals.db, person.id)
-	};
+	redirect(303, `/family#person-${user.personId}`);
 }
 
 /** @type {import('./$types').Actions} */

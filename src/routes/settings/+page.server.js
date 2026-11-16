@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { DEFAULT_UPCOMING_WEEKS } from '$lib/constants.js';
 import { recordAudit } from '$lib/server/audit.js';
 import { requireAdmin } from '$lib/server/auth.js';
@@ -9,7 +9,7 @@ import { asString, isValidUpcomingWeeks } from '$lib/server/validation.js';
 /** @type {import('./$types').PageServerLoad} */
 export function load({ locals }) {
 	requireAdmin(locals);
-	return { csrf: locals.csrf, settings: getLodgeSettings(locals.db) };
+	redirect(303, '/admin?tab=settings');
 }
 
 /** @type {import('./$types').Actions} */

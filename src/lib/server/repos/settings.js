@@ -13,8 +13,8 @@ const DEFAULT_TERMINOLOGY = {
 };
 
 const DEFAULT_THEME = {
-	accent: '#8b4513',
-	accentDark: '#c4a574'
+	accent: '#C1912E',
+	accentDark: '#E8C86A'
 };
 
 /**

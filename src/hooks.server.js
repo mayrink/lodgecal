@@ -7,7 +7,7 @@ import { getLodgeSettings } from '$lib/server/repos/settings.js';
 import { getSessionUser } from '$lib/server/sessions.js';
 
 const PUBLIC_PREFIXES = ['/setup', '/login'];
-const ADMIN_PREFIXES = ['/people', '/events', '/event-types', '/users', '/settings'];
+const ADMIN_PREFIXES = ['/admin', '/people', '/events', '/event-types', '/users', '/settings'];
 
 function startsWithAny(path, prefixes) {
 	return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
@@ -64,15 +64,5 @@ export async function handle({ event, resolve }) {
 		}
 	}
 
-	return resolve(event, {
-		transformPageChunk: ({ html }) => {
-			const accent = event.locals.lodge?.theme?.accent;
-			const accentDark = event.locals.lodge?.theme?.accentDark;
-			if (!accent) return html;
-			return html.replace(
-				'<html lang="en">',
-				`<html lang="en" style="--accent:${accent};--accent-dark:${accentDark || accent}">`
-			);
-		}
-	});
+	return resolve(event);
 }

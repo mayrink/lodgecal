@@ -5,9 +5,14 @@
  */
 export function honorificName(person, terminology) {
 	if (!person) return '';
-	const name = person.full_name || person.fullName;
-	if (person.gender === 'FEMALE') return `${terminology.sister || 'Sis∴'} ${name}`;
-	if (person.gender === 'MALE') return `${terminology.brother || 'Bro∴'} ${name}`;
+	const name = (person.full_name || person.fullName || '').trim();
+	const bro = terminology?.brother || 'Bro∴';
+	const sis = terminology?.sister || 'Sis∴';
+	if (name.startsWith(bro) || name.startsWith(sis) || /^Bro[.\u2234]\s/i.test(name)) {
+		return name;
+	}
+	if (person.gender === 'FEMALE') return `${sis} ${name}`;
+	if (person.gender === 'MALE') return `${bro} ${name}`;
 	return name;
 }
 

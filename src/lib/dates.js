@@ -15,12 +15,17 @@ export function plainDate(iso) {
 }
 
 /**
- * Today's civil date in the given IANA time zone (default UTC).
+ * Today's civil date in the given IANA time zone (defaults to local/configured timezone).
  * @param {string} [timeZone]
  * @returns {Temporal.PlainDate}
  */
-export function today(timeZone = 'UTC') {
-	return Temporal.Now.plainDateISO(timeZone);
+export function today(timeZone) {
+	const tz =
+		timeZone ||
+		process.env.TZ ||
+		Intl.DateTimeFormat().resolvedOptions().timeZone ||
+		'America/Sao_Paulo';
+	return Temporal.Now.plainDateISO(tz);
 }
 
 /**
@@ -180,6 +185,23 @@ const MONTH_ABBR = [
 	'Dec'
 ];
 
+const MONTH_FULL = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
+
+const WEEKDAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 /**
  * @param {Temporal.PlainDate | string} date
  * @returns {{ day: number, monthAbbr: string, iso: string }}
@@ -191,6 +213,68 @@ export function calendarSheet(date) {
 		monthAbbr: MONTH_ABBR[d.month - 1],
 		iso: d.toString()
 	};
+}
+
+/**
+ * Format as "15 Nov"
+ * @param {Temporal.PlainDate | string} date
+ * @returns {string}
+ */
+export function formatDayMonthShort(date) {
+	const d = typeof date === 'string' ? plainDate(date) : date;
+	return `${d.day} ${MONTH_ABBR[d.month - 1]}`;
+}
+
+/**
+ * Format as "24 November"
+ * @param {Temporal.PlainDate | string} date
+ * @returns {string}
+ */
+export function formatDayMonthLong(date) {
+	const d = typeof date === 'string' ? plainDate(date) : date;
+	return `${d.day} ${MONTH_FULL[d.month - 1]}`;
+}
+
+/**
+ * Format as "15 Nov 2026"
+ * @param {Temporal.PlainDate | string} date
+ * @returns {string}
+ */
+export function formatDateShortYear(date) {
+	const d = typeof date === 'string' ? plainDate(date) : date;
+	return `${d.day} ${MONTH_ABBR[d.month - 1]} ${d.year}`;
+}
+
+/**
+ * Format as "25 December 2026"
+ * @param {Temporal.PlainDate | string} date
+ * @returns {string}
+ */
+export function formatDateLongYear(date) {
+	const d = typeof date === 'string' ? plainDate(date) : date;
+	return `${d.day} ${MONTH_FULL[d.month - 1]} ${d.year}`;
+}
+
+/**
+ * Three-letter weekday ("Mon".."Sun") using Temporal.PlainDate.dayOfWeek (1=Mon..7=Sun).
+ * @param {Temporal.PlainDate | string} date
+ * @returns {string}
+ */
+export function weekdayShort(date) {
+	const d = typeof date === 'string' ? plainDate(date) : date;
+	return WEEKDAY_ABBR[d.dayOfWeek - 1];
+}
+
+/**
+ * Whole days from `start` to `end` (positive when end > start).
+ * @param {Temporal.PlainDate | string} start
+ * @param {Temporal.PlainDate | string} end
+ * @returns {number}
+ */
+export function daysBetween(start, end) {
+	const s = typeof start === 'string' ? plainDate(start) : start;
+	const e = typeof end === 'string' ? plainDate(end) : end;
+	return s.until(e, { largestUnit: 'days' }).days;
 }
 
 /**

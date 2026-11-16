@@ -2,9 +2,14 @@
 	let { form, data } = $props();
 </script>
 
-<form method="POST" class="form-card wide stack">
-	<h1>LodgeCal setup</h1>
-	<p class="muted">Create the Lodge profile and the first administrator. The database is initialized automatically.</p>
+<form method="POST" class="auth-card wide stack">
+	<div>
+		<h1>LodgeCal setup</h1>
+		<p class="auth-sub" style="margin-bottom:0.5rem">
+			Create the Lodge profile and the first administrator. The database is initialized
+			automatically.
+		</p>
+	</div>
 	<input type="hidden" name="csrf" value={data.csrf} />
 	{#if form?.error}
 		<p class="error" role="alert">{form.error}</p>
@@ -20,7 +25,7 @@
 		</div>
 		<div class="field field-full">
 			<label for="obedience">Obedience</label>
-			<input id="obedience" name="obedience" placeholder="e.g. GLESP" />
+			<input id="obedience" name="obedience" placeholder="e.g. GLESP / GOP" />
 		</div>
 		<div class="field field-full">
 			<label for="fullName">Administrator full name</label>

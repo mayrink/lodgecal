@@ -10,7 +10,7 @@ web
 
 Primary user: the Lodge admin (Chancellor-equivalent officer) — currently Georges himself — who maintains people, households, events, event types, users, and Lodge settings.
 
-Secondary users: Lodge Brothers with the USER role. They see only the main pages (Home, My Details, My Family) — the entire Administration menu (People, Events, Event Types, Users, Lodge/Settings) is hidden from them. Within their own household they can view and edit their own Person record, view their spouse/children, create new family members, and add dated-knowledge entries — but they cannot delete a family member (removal is admin-only) and cannot see or edit any other household's data at all.
+Secondary users: Lodge Brothers with the USER role. They see the main navigation tabs (Birthdays, My family, Brothers) — the Admin tab is hidden from them. Within their own household they can view and edit their own Person record, view/add/edit their spouse and children, and manage dated birthday notes — but they cannot remove a family member (removal is admin-only), cannot see private family/notes of other households, cannot see sleeping/departed Brothers, and only see `Turns X` (age) for their own spouse and children.
 
 ## Product Purpose
 
@@ -31,13 +31,13 @@ Georges plans to publish LodgeCal as open source. Future work should keep this i
 ## Capabilities and Constraints
 
 - Exactly two roles, ADMIN and USER, enforced in server `load`/`actions`/`hooks.server.js`, not only by hiding navigation.
-- People require a mandatory ISO birth date; age is computed on display, never stored, and is visible only to admins.
-- Inactive/departed Brothers and households are retained but hidden from regular users; admins can see and reinstate them.
-- "Dated knowledge" entries (e.g., a recent PhD, an artistic talent) are append-only historical records per person, not a single editable notes field.
+- People require a mandatory ISO birth date; age is computed on display, never stored, and is visible only to admins (and to a Brother for his own spouse and children).
+- Inactive/departed ("sleeping") Brothers and households are retained but hidden from regular users; admins can see and reinstate them.
+- "Dated knowledge" birthday notes (e.g., a recent PhD, an artistic talent) are append-only historical records per person with an effective date so greeting writers know how current each note is.
 - All date-only logic (birthdays, recurrence, sorting) goes through one Temporal-based utility; birthdays follow an explicit Feb 29 → Feb 28 rule in non-leap years.
 - Security: Argon2id password hashing, forced password change at first login, opaque server-side sessions (HttpOnly/SameSite cookies), CSRF protection, failed-login throttling, and an audit log of logins and material changes.
 - Regular users (USER role) can create family members and edit their own household, but only an admin can remove one — enforced server-side, not just by hiding a button.
-- Regular users have zero visibility into any household but their own; there is no "browse other members" path for the USER role anywhere in the app.
+- Regular users can view the active Brothers directory (name, birthday day/month, contact info), but have zero visibility into other Brothers' family members, private notes, ages, or sleeping/departed status.
 - The interface language is English today, by Georges's own working preference, even though the Lodge this instance serves is Brazilian and the intended eventual language is Brazilian Portuguese. Localization (pt-BR, with English likely kept as a second language) is planned but not yet built — treat any stray non-English string in the current UI as unfinished copy to fix now, not as evidence that i18n has already started.
 - Explicitly out of scope for *this build* (not necessarily forever): multi-Lodge tenancy, a full i18n/locale-switching framework, messaging, file/image uploads stored in the app, a public calendar, and a general family tree.
 
