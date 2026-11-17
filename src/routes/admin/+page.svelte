@@ -41,7 +41,7 @@
 					editFamilyPersonId = null;
 					newEventOpen = false;
 					editEventId = null;
-					toastKey = Date.now();
+					toastKey = Temporal.Now.instant().epochMilliseconds;
 					onDone();
 				}
 			};
@@ -183,7 +183,7 @@
 						</div>
 						<div class="f-col-1">
 							<label class="muted-label" for="nb-birth">Birth date</label>
-							<input id="nb-birth" name="birthDate" type="date" required />
+							<input id="nb-birth" name="birthDate" type="date" max={data.today} required />
 						</div>
 						<div class="f-col-1">
 							<label class="muted-label" for="nb-phone">Phone (optional)</label>
@@ -347,6 +347,7 @@
 												name="birthDate"
 												type="date"
 												value={b.birthDate}
+												max={data.today}
 												required
 											/>
 										</div>
@@ -545,6 +546,7 @@
 																		name="birthDate"
 																		type="date"
 																		value={f.birthDate}
+																		max={data.today}
 																		required
 																	/>
 																</div>
@@ -705,6 +707,7 @@
 												id="fb-{b.userId}"
 												name="birthDate"
 												type="date"
+												max={data.today}
 												required
 											/>
 										</div>

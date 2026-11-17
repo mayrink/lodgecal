@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { SESSION_COOKIE } from '../constants.js';
-import { nowIso } from './db.js';
+import { Temporal, nowInstant, nowIso } from '../dates.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -18,7 +18,7 @@ export function createSessionId() {
  */
 export function createSession(db, userId) {
 	const id = createSessionId();
-	const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+	const expiresAt = nowInstant().add({ milliseconds: SESSION_TTL_MS }).toString();
 	db.prepare('INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').run(
 		id,
 		userId,
@@ -62,7 +62,7 @@ export function getSessionUser(db, sessionId) {
 		db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 		return null;
 	}
-	if (new Date(row.expires_at).getTime() <= Date.now()) {
+	if (Temporal.Instant.compare(Temporal.Instant.from(row.expires_at), nowInstant()) <= 0) {
 		db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 		return null;
 	}
@@ -116,12 +116,20 @@ export function purgeExpiredSessions(db) {
  * @param {string} expiresAt
  */
 export function setSessionCookie(cookies, sessionId, expiresAt) {
+	const remainingSeconds = Math.max(
+		0,
+		Math.floor(
+			(Temporal.Instant.from(expiresAt).epochMilliseconds -
+				nowInstant().epochMilliseconds) /
+				1000
+		)
+	);
 	cookies.set(SESSION_COOKIE, sessionId, {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
 		secure: process.env.NODE_ENV === 'production',
-		expires: new Date(expiresAt)
+		maxAge: remainingSeconds
 	});
 }
 

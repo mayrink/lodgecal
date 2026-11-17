@@ -13,6 +13,7 @@ export function load({ locals, url }) {
 			: null,
 		lodge: locals.lodge,
 		csrf: locals.csrf,
+		locale: locals.locale || 'pt-BR',
 		path: url.pathname
 	};
 }

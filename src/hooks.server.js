@@ -1,5 +1,7 @@
 import { error } from '@sveltejs/kit';
-import { SESSION_COOKIE } from '$lib/constants.js';
+import '$lib/dates.js';
+import { LOCALE_COOKIE, SESSION_COOKIE } from '$lib/constants.js';
+import { localizedTerminology, resolveLocale } from '$lib/i18n.js';
 import { ensureCsrfCookie, verifyCsrf } from '$lib/server/csrf.js';
 import { getDb } from '$lib/server/db.js';
 import { isSetupComplete } from '$lib/server/repos/users.js';
@@ -19,10 +21,19 @@ export async function handle({ event, resolve }) {
 	event.locals.db = db;
 	event.locals.csrf = ensureCsrfCookie(event.cookies);
 
+	const locale = resolveLocale(event.cookies.get(LOCALE_COOKIE));
+	event.locals.locale = locale;
+
 	const auth = getSessionUser(db, event.cookies.get(SESSION_COOKIE));
 	event.locals.user = auth?.user ?? null;
 	event.locals.person = auth?.person ?? null;
-	event.locals.lodge = getLodgeSettings(db);
+	const rawLodge = getLodgeSettings(db);
+	event.locals.lodge = rawLodge
+		? {
+				...rawLodge,
+				terminology: localizedTerminology(locale, rawLodge.terminology)
+			}
+		: null;
 
 	const setupDone = isSetupComplete(db);
 	const path = event.url.pathname;

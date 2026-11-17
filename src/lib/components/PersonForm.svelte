@@ -1,4 +1,6 @@
 <script>
+	import { today } from '$lib/dates.js';
+
 	let {
 		person = null,
 		csrf,
@@ -31,6 +33,7 @@
 			name="birthDate"
 			type="date"
 			value={person?.birth_date ?? person?.birthDate ?? ''}
+			max={today().toString()}
 			required
 		/>
 	</div>

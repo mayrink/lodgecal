@@ -1,6 +1,49 @@
 import { Temporal as TemporalPolyfill } from '@js-temporal/polyfill';
 
-export const Temporal = globalThis.Temporal ?? TemporalPolyfill;
+// Ensure Temporal is globally available across client and server runtimes
+if (!globalThis.Temporal) {
+	globalThis.Temporal = TemporalPolyfill;
+}
+
+export const Temporal = globalThis.Temporal;
+
+/**
+ * Current exact time as a Temporal.Instant.
+ * @returns {Temporal.Instant}
+ */
+export function nowInstant() {
+	return Temporal.Now.instant();
+}
+
+/**
+ * Current ISO-8601 UTC timestamp string using Temporal.
+ * @returns {string}
+ */
+export function nowIso() {
+	return Temporal.Now.instant().toString();
+}
+
+/**
+ * Current epoch milliseconds using Temporal.
+ * @returns {number}
+ */
+export function nowEpochMs() {
+	return Temporal.Now.instant().epochMilliseconds;
+}
+
+/**
+ * Current civil date and time in the specified or local timezone using Temporal.
+ * @param {string} [timeZone]
+ * @returns {Temporal.PlainDateTime}
+ */
+export function nowPlainDateTime(timeZone) {
+	const tz =
+		timeZone ||
+		process.env.TZ ||
+		Intl.DateTimeFormat().resolvedOptions().timeZone ||
+		'America/Sao_Paulo';
+	return Temporal.Now.plainDateTimeISO(tz);
+}
 
 /**
  * Parse a YYYY-MM-DD civil date. Never uses JavaScript Date.
@@ -170,99 +213,142 @@ export function compareDates(a, b) {
 	return Temporal.PlainDate.compare(da, db);
 }
 
-const MONTH_ABBR = [
-	'Jan',
-	'Feb',
-	'Mar',
-	'Apr',
-	'May',
-	'Jun',
-	'Jul',
-	'Aug',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Dec'
-];
+const MONTH_ABBR_BY_LOCALE = {
+	en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+	'pt-BR': ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+	es: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+};
 
-const MONTH_FULL = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December'
-];
+const MONTH_FULL_BY_LOCALE = {
+	en: [
+		'January',
+		'February',
+		'March',
+		'April',
+		'May',
+		'June',
+		'July',
+		'August',
+		'September',
+		'October',
+		'November',
+		'December'
+	],
+	'pt-BR': [
+		'janeiro',
+		'fevereiro',
+		'março',
+		'abril',
+		'maio',
+		'junho',
+		'julho',
+		'agosto',
+		'setembro',
+		'outubro',
+		'novembro',
+		'dezembro'
+	],
+	es: [
+		'enero',
+		'febrero',
+		'marzo',
+		'abril',
+		'mayo',
+		'junio',
+		'julio',
+		'agosto',
+		'septiembre',
+		'octubre',
+		'noviembre',
+		'diciembre'
+	]
+};
 
-const WEEKDAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_ABBR_BY_LOCALE = {
+	en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+	'pt-BR': ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+	es: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+};
 
 /**
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {{ day: number, monthAbbr: string, iso: string }}
  */
-export function calendarSheet(date) {
+export function calendarSheet(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
+	const months = MONTH_ABBR_BY_LOCALE[locale] ?? MONTH_ABBR_BY_LOCALE.en;
 	return {
 		day: d.day,
-		monthAbbr: MONTH_ABBR[d.month - 1],
+		monthAbbr: months[d.month - 1],
 		iso: d.toString()
 	};
 }
 
 /**
- * Format as "15 Nov"
+ * Format as "15 Nov" / "15 Set" / "15 Ene"
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {string}
  */
-export function formatDayMonthShort(date) {
+export function formatDayMonthShort(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
-	return `${d.day} ${MONTH_ABBR[d.month - 1]}`;
+	const months = MONTH_ABBR_BY_LOCALE[locale] ?? MONTH_ABBR_BY_LOCALE.en;
+	return `${d.day} ${months[d.month - 1]}`;
 }
 
 /**
- * Format as "24 November"
+ * Format as "24 November" / "24 de novembro" / "24 de noviembre"
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {string}
  */
-export function formatDayMonthLong(date) {
+export function formatDayMonthLong(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
-	return `${d.day} ${MONTH_FULL[d.month - 1]}`;
+	const months = MONTH_FULL_BY_LOCALE[locale] ?? MONTH_FULL_BY_LOCALE.en;
+	if (locale === 'pt-BR' || locale === 'es') {
+		return `${d.day} de ${months[d.month - 1]}`;
+	}
+	return `${d.day} ${months[d.month - 1]}`;
 }
 
 /**
  * Format as "15 Nov 2026"
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {string}
  */
-export function formatDateShortYear(date) {
+export function formatDateShortYear(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
-	return `${d.day} ${MONTH_ABBR[d.month - 1]} ${d.year}`;
+	const months = MONTH_ABBR_BY_LOCALE[locale] ?? MONTH_ABBR_BY_LOCALE.en;
+	return `${d.day} ${months[d.month - 1]} ${d.year}`;
 }
 
 /**
- * Format as "25 December 2026"
+ * Format as "25 December 2026" / "25 de dezembro de 2026"
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {string}
  */
-export function formatDateLongYear(date) {
+export function formatDateLongYear(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
-	return `${d.day} ${MONTH_FULL[d.month - 1]} ${d.year}`;
+	const months = MONTH_FULL_BY_LOCALE[locale] ?? MONTH_FULL_BY_LOCALE.en;
+	if (locale === 'pt-BR' || locale === 'es') {
+		return `${d.day} de ${months[d.month - 1]} de ${d.year}`;
+	}
+	return `${d.day} ${months[d.month - 1]} ${d.year}`;
 }
 
 /**
- * Three-letter weekday ("Mon".."Sun") using Temporal.PlainDate.dayOfWeek (1=Mon..7=Sun).
+ * Three-letter weekday ("Mon".."Sun" / "Seg".."Dom" / "Lun".."Dom").
  * @param {Temporal.PlainDate | string} date
+ * @param {string} [locale]
  * @returns {string}
  */
-export function weekdayShort(date) {
+export function weekdayShort(date, locale = 'en') {
 	const d = typeof date === 'string' ? plainDate(date) : date;
-	return WEEKDAY_ABBR[d.dayOfWeek - 1];
+	const days = WEEKDAY_ABBR_BY_LOCALE[locale] ?? WEEKDAY_ABBR_BY_LOCALE.en;
+	return days[d.dayOfWeek - 1];
 }
 
 /**

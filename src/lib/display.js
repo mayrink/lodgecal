@@ -8,7 +8,7 @@ export function honorificName(person, terminology) {
 	const name = (person.full_name || person.fullName || '').trim();
 	const bro = terminology?.brother || 'Bro∴';
 	const sis = terminology?.sister || 'Sis∴';
-	if (name.startsWith(bro) || name.startsWith(sis) || /^Bro[.\u2234]\s/i.test(name)) {
+	if (name.startsWith(bro) || name.startsWith(sis) || /^(?:Bro|Ir|H|Sis)[.\u2234]\s/i.test(name)) {
 		return name;
 	}
 	if (person.gender === 'FEMALE') return `${sis} ${name}`;

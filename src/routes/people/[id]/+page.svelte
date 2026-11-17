@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { Temporal } from '$lib/dates.js';
 	import Icon from '$lib/components/Icon.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 
@@ -15,7 +16,7 @@
 				if (result.type === 'success') {
 					editingSelf = false;
 					addingFamily = false;
-					toastKey = Date.now();
+					toastKey = Temporal.Now.instant().epochMilliseconds;
 				}
 			};
 	}
@@ -77,7 +78,7 @@
 						</div>
 						<div class="field">
 							<label for="p-bd">Birth date</label>
-							<input id="p-bd" name="birthDate" type="date" value={data.person.birth_date} required />
+							<input id="p-bd" name="birthDate" type="date" value={data.person.birth_date} max={data.today} required />
 						</div>
 						<div class="field">
 							<label for="p-gn">Gender</label>
@@ -175,7 +176,7 @@
 					</div>
 					<div class="field">
 						<label for="nf-birth">Birth date</label>
-						<input id="nf-birth" name="birthDate" type="date" required />
+						<input id="nf-birth" name="birthDate" type="date" max={data.today} required />
 					</div>
 					<div class="field">
 						<label for="nf-phone">Phone (optional)</label>

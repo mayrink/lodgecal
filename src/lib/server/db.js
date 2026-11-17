@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
+import { nowIso } from '../dates.js';
+
+export { nowIso };
 
 const ROOT = process.cwd();
 const MIGRATIONS_DIR = join(ROOT, 'migrations');
@@ -13,13 +16,6 @@ let instance = null;
  */
 export function databasePath() {
 	return process.env.LODGECAL_DATABASE_PATH || join(ROOT, 'data', 'lodgecal.sqlite');
-}
-
-/**
- * @returns {string}
- */
-export function nowIso() {
-	return new Date().toISOString();
 }
 
 /**

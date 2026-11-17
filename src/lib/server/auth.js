@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS, PERSON_STATUS, ROLES, SESSION_COOKIE } from '../constants.js';
+import { nowInstant } from '../dates.js';
 import { recordAudit, recordLoginAttempt } from './audit.js';
 import { getDb } from './db.js';
 import { verifyPassword } from './passwords.js';
@@ -24,7 +25,7 @@ export const GENERIC_LOGIN_FAILURE = 'Invalid email or password.';
  * @returns {boolean}
  */
 export function isLoginThrottled(db, emailNormalized) {
-	const since = new Date(Date.now() - LOGIN_WINDOW_MS).toISOString();
+	const since = nowInstant().subtract({ milliseconds: LOGIN_WINDOW_MS }).toString();
 	const row = db
 		.prepare(
 			`SELECT COUNT(*) AS n FROM login_attempts

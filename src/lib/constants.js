@@ -45,6 +45,8 @@ export const DEFAULT_UPCOMING_WEEKS = 4;
 
 export const SESSION_COOKIE = 'lodgecal_session';
 export const CSRF_COOKIE = 'lodgecal_csrf';
+export const LOCALE_COOKIE = 'lodgecal_locale';
+export const DEFAULT_LOCALE = 'pt-BR';
 
 export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const LOGIN_MAX_FAILURES = 8;

@@ -13,6 +13,7 @@ import {
 	weekdayShort
 } from '../dates.js';
 import { childLabel, honorificName, itemContext } from '../display.js';
+import { t, translateEventTypeLabel } from '../i18n.js';
 import { listEvents } from './repos/events.js';
 
 /**
@@ -72,8 +73,9 @@ function annotatePerson(person, index) {
 /**
  * Load active knowledge entries grouped by person_id.
  * @param {import('better-sqlite3').Database} db
+ * @param {string} [locale]
  */
-function activeKnowledgeMap(db) {
+function activeKnowledgeMap(db, locale = 'en') {
 	const rows = db
 		.prepare(
 			`SELECT id, person_id, body, effective_date
@@ -89,7 +91,7 @@ function activeKnowledgeMap(db) {
 			id: row.id,
 			body: row.body,
 			effectiveDate: row.effective_date,
-			dateFormatted: formatDateShortYear(row.effective_date)
+			dateFormatted: formatDateShortYear(row.effective_date, locale)
 		});
 		map.set(row.person_id, list);
 	}
@@ -99,32 +101,38 @@ function activeKnowledgeMap(db) {
 /**
  * Format relationship label for the Upcoming Birthdays feed.
  */
-function formatRelationForViewer(person, meta, terminology, viewerPersonId) {
+function formatRelationForViewer(person, meta, terminology, viewerPersonId, locale = 'en') {
 	if (viewerPersonId && person.id === viewerPersonId) {
-		return 'You, brother of the lodge';
+		return t(locale, 'relations.youBrother');
 	}
 	if (viewerPersonId && meta.owner && meta.owner.id === viewerPersonId) {
 		if (meta.relationship === 'SPOUSE') {
-			if (person.gender === 'FEMALE') return 'Your wife';
-			if (person.gender === 'MALE') return 'Your husband';
-			return `Your ${(terminology.spouse || 'spouse').toLowerCase()}`;
+			return t(locale, 'relations.yourSpouse');
 		}
 		if (meta.relationship === 'CHILD') {
-			if (person.gender === 'FEMALE') return `Your ${(terminology.daughter || 'daughter').toLowerCase()}`;
-			if (person.gender === 'MALE') return `Your ${(terminology.son || 'son').toLowerCase()}`;
-			return `Your ${(terminology.child || 'child').toLowerCase()}`;
+			if (person.gender === 'FEMALE') return t(locale, 'relations.yourDaughter');
+			if (person.gender === 'MALE') return t(locale, 'relations.yourSon');
+			return t(locale, 'relations.yourChild');
 		}
 	}
 	if (meta.owner && meta.relationship === 'SPOUSE') {
-		return `${terminology.spouse || 'Spouse'} of ${honorificName(meta.owner, terminology)}`;
+		return t(locale, 'relations.spouseOf', {
+			spouse: terminology.spouse || t(locale, 'terms.spouse'),
+			owner: honorificName(meta.owner, terminology)
+		});
 	}
 	if (meta.owner && meta.relationship === 'CHILD') {
-		return `${childLabel(person, terminology)} of ${honorificName(meta.owner, terminology)}`;
+		return t(locale, 'relations.childOf', {
+			child: childLabel(person, terminology),
+			owner: honorificName(meta.owner, terminology)
+		});
 	}
 	if (meta.isMember) {
-		return person.gender === 'FEMALE' ? 'Sister' : 'Brother';
+		return person.gender === 'FEMALE'
+			? t(locale, 'relations.sister')
+			: t(locale, 'relations.brother');
 	}
-	return 'Birthday';
+	return t(locale, 'relations.birthday');
 }
 
 /**
@@ -140,8 +148,9 @@ function formatRelationForViewer(person, meta, terminology, viewerPersonId) {
  * }} opts
  */
 export function collectUpcoming(db, opts) {
+	const locale = opts.locale || 'en';
 	const index = householdIndex(db);
-	const knowledgeByPerson = activeKnowledgeMap(db);
+	const knowledgeByPerson = activeKnowledgeMap(db, locale);
 	const people = db.prepare('SELECT * FROM people').all();
 	const items = [];
 	const startPlain = typeof opts.from === 'string' ? Temporal.PlainDate.from(opts.from) : opts.from;
@@ -179,17 +188,27 @@ export function collectUpcoming(db, opts) {
 				id: `bday-${person.id}-${date.toString()}`,
 				kind: 'birthday',
 				iso: date.toString(),
-				sheet: calendarSheet(date),
-				dateText: formatDayMonthShort(date),
-				weekday: weekdayShort(date),
+				sheet: calendarSheet(date, locale),
+				dateText: formatDayMonthShort(date, locale),
+				weekday: weekdayShort(date, locale),
 				daysAway,
 				countdown:
-					daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `In ${daysAway} days`,
+					daysAway === 0
+						? t(locale, 'home.today')
+						: daysAway === 1
+							? t(locale, 'home.tomorrow')
+							: t(locale, 'home.inDays', { days: daysAway }),
 				title: person.full_name,
 				displayName,
 				context: itemContext(raw, opts.terminology),
-				relation: formatRelationForViewer(person, meta, opts.terminology, viewerPersonId),
-				turns: canSeeAge ? `Turns ${ageTurning}` : null,
+				relation: formatRelationForViewer(
+					person,
+					meta,
+					opts.terminology,
+					viewerPersonId,
+					locale
+				),
+				turns: canSeeAge ? t(locale, 'home.turns', { age: ageTurning }) : null,
 				ageTurning: canSeeAge ? ageTurning : null,
 				canSee,
 				locked: !canSee,
@@ -213,28 +232,39 @@ export function collectUpcoming(db, opts) {
 		);
 		for (const date of dates) {
 			const daysAway = daysBetween(startPlain, date);
+			const localizedTypeLabel = translateEventTypeLabel(
+				locale,
+				event.type_key,
+				event.type_label
+			);
 			items.push({
 				id: `evt-${event.id}-${date.toString()}`,
 				kind: 'event',
 				iso: date.toString(),
-				sheet: calendarSheet(date),
-				dateText: formatDayMonthShort(date),
-				weekday: weekdayShort(date),
+				sheet: calendarSheet(date, locale),
+				dateText: formatDayMonthShort(date, locale),
+				weekday: weekdayShort(date, locale),
 				daysAway,
 				countdown:
-					daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `In ${daysAway} days`,
+					daysAway === 0
+						? t(locale, 'home.today')
+						: daysAway === 1
+							? t(locale, 'home.tomorrow')
+							: t(locale, 'home.inDays', { days: daysAway }),
 				title: event.title,
 				typeKey: event.type_key,
-				typeLabel: event.type_label,
+				typeLabel: localizedTypeLabel,
 				personName: event.person_name || '',
 				details: event.details || '',
 				recurring: Boolean(event.recurring),
-				repeatLabel: event.recurring ? 'Repeats annually' : 'One time',
+				repeatLabel: event.recurring
+					? t(locale, 'home.repeatsAnnually')
+					: t(locale, 'home.oneTime'),
 				context: itemContext(
 					{
 						kind: 'event',
 						personName: event.person_name,
-						typeLabel: event.type_label
+						typeLabel: localizedTypeLabel
 					},
 					opts.terminology
 				),
@@ -264,6 +294,7 @@ export function collectUpcoming(db, opts) {
  * }} opts
  */
 export function dashboardData(db, opts) {
+	const locale = opts.locale || 'en';
 	const from = today();
 	const to = addWeeks(from, opts.upcomingWeeks);
 	const maxLookaheadWeeks = Math.max(opts.upcomingWeeks, 8);
@@ -280,7 +311,8 @@ export function dashboardData(db, opts) {
 		includeInactive: false,
 		terminology,
 		isAdmin: opts.isAdmin,
-		viewerPersonId: opts.viewerPersonId
+		viewerPersonId: opts.viewerPersonId,
+		locale
 	});
 	const extendedUpcoming = collectUpcoming(db, {
 		from,
@@ -288,7 +320,8 @@ export function dashboardData(db, opts) {
 		includeInactive: false,
 		terminology,
 		isAdmin: opts.isAdmin,
-		viewerPersonId: opts.viewerPersonId
+		viewerPersonId: opts.viewerPersonId,
+		locale
 	});
 	const monthItems = collectUpcoming(db, {
 		from: monthStart,
@@ -296,7 +329,8 @@ export function dashboardData(db, opts) {
 		includeInactive: false,
 		terminology,
 		isAdmin: opts.isAdmin,
-		viewerPersonId: opts.viewerPersonId
+		viewerPersonId: opts.viewerPersonId,
+		locale
 	});
 	const nextMonthItems = collectUpcoming(db, {
 		from: nextMonthStart,
@@ -304,7 +338,8 @@ export function dashboardData(db, opts) {
 		includeInactive: false,
 		terminology,
 		isAdmin: opts.isAdmin,
-		viewerPersonId: opts.viewerPersonId
+		viewerPersonId: opts.viewerPersonId,
+		locale
 	});
 
 	let adminInactive = [];
@@ -315,7 +350,8 @@ export function dashboardData(db, opts) {
 			includeInactive: true,
 			terminology,
 			isAdmin: true,
-			viewerPersonId: opts.viewerPersonId
+			viewerPersonId: opts.viewerPersonId,
+			locale
 		});
 		adminInactive = all.filter((item) => item.inactive);
 	}

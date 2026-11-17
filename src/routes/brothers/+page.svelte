@@ -2,13 +2,14 @@
 	import { enhance } from '$app/forms';
 	import { fly, fade } from 'svelte/transition';
 	import { sortableTable } from '$lib/sortable-table.js';
+	import { Temporal } from '$lib/dates.js';
 	import Icon from '$lib/components/Icon.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 
 	let { data, form } = $props();
 
 	let searchQuery = $state('');
-	let showSleeping = $state(false);
+	let showSleeping = $state(true);
 	let editTarget = $state(null);
 	let deleteTarget = $state(null);
 	let deleteTypedName = $state('');
@@ -156,7 +157,7 @@
 												await update();
 												if (result.type === 'success') {
 													if (!row.sleeping) showSleeping = true;
-													toastKey = Date.now();
+													toastKey = Temporal.Now.instant().epochMilliseconds;
 												}
 											};
 										}}
@@ -243,7 +244,7 @@
 					await update();
 					if (result.type === 'success') {
 						closeEditPane();
-						toastKey = Date.now();
+						toastKey = Temporal.Now.instant().epochMilliseconds;
 					}
 				};
 			}}
@@ -274,6 +275,7 @@
 						name="birthDate"
 						type="date"
 						value={editTarget.birthDate}
+						max={data.today}
 						required
 					/>
 				</div>
@@ -356,7 +358,7 @@
 					await update();
 					if (result.type === 'success') {
 						closeDeleteModal();
-						toastKey = Date.now();
+						toastKey = Temporal.Now.instant().epochMilliseconds;
 					}
 				};
 			}}

@@ -7,10 +7,14 @@ import {
 	ageOn,
 	birthdayOccurrencesInRange,
 	nextBirthday,
+	nowEpochMs,
+	nowInstant,
+	nowIso,
 	occurrenceInYear,
 	occurrencesInRange,
 	plainDate
 } from './dates.js';
+import { validatePersonInput } from './server/validation.js';
 import { closeDb, getDb } from './server/db.js';
 import { createEvent, getEventTypeByKey, resolveRecurrence } from './server/events.js';
 import { hashPassword } from './server/passwords.js';
@@ -28,6 +32,41 @@ describe('Temporal civil dates', () => {
 		expect(d.year).toBe(2024);
 		expect(d.month).toBe(2);
 		expect(d.day).toBe(29);
+	});
+
+	it('provides global Temporal polyfill and Instant utilities', () => {
+		expect(globalThis.Temporal).toBeDefined();
+		const inst = nowInstant();
+		expect(inst instanceof Temporal.Instant).toBe(true);
+		expect(typeof nowIso()).toBe('string');
+		expect(typeof nowEpochMs()).toBe('number');
+		expect(nowEpochMs()).toBeGreaterThan(0);
+	});
+
+	it('validates person input and normalizes civil birth dates', () => {
+		const parsedIso = validatePersonInput({
+			fullName: 'Test Brother',
+			gender: 'MALE',
+			birthDate: '1985-05-20'
+		});
+		expect(parsedIso.ok).toBe(true);
+		expect(parsedIso.value.birthDate).toBe('1985-05-20');
+
+		const parsedDmy = validatePersonInput({
+			fullName: 'Test Brother 2',
+			gender: 'MALE',
+			birthDate: '20/05/1985'
+		});
+		expect(parsedDmy.ok).toBe(true);
+		expect(parsedDmy.value.birthDate).toBe('1985-05-20');
+
+		const future = validatePersonInput({
+			fullName: 'Future Child',
+			gender: 'MALE',
+			birthDate: '2099-01-01'
+		});
+		expect(future.ok).toBe(false);
+		expect(future.error).toContain('cannot be in the future');
 	});
 
 	it('rejects invalid ISO dates', () => {
