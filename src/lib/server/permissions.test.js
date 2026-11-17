@@ -11,6 +11,7 @@ import {
 	getActiveSpouse,
 	householdPersonIds,
 	insertPerson,
+	listAdminBrothersWithFamilies,
 	listBrothersDirectory,
 	personHasUserAccount,
 	setPersonStatus
@@ -368,5 +369,42 @@ describe('crafted recurrence requests', () => {
 			recurring: true
 		});
 		expect(created.ok).toBe(false);
+	});
+});
+
+describe('admin brothers with families listing', () => {
+	afterEach(() => closeDb());
+
+	it('preserves status for family members so active household members are not considered sleeping', async () => {
+		const db = tempDb();
+		const pBrother = insertPerson(db, {
+			fullName: 'Active Brother',
+			gender: 'MALE',
+			birthDate: '1980-05-10',
+			email: 'active-brother@example.com',
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		const hash = await hashPassword('temporary-password-ok');
+		const userId = insertUser(db, {
+			personId: pBrother,
+			passwordHash: hash,
+			role: ROLES.USER
+		});
+		const pSpouse = insertPerson(db, {
+			fullName: 'Active Wife',
+			gender: 'FEMALE',
+			birthDate: '1982-08-20',
+			email: 'active-wife@example.com',
+			phone: null,
+			status: PERSON_STATUS.ACTIVE
+		});
+		addHouseholdMember(db, userId, pSpouse, RELATIONSHIPS.SPOUSE);
+
+		const brothers = listAdminBrothersWithFamilies(db);
+		expect(brothers).toHaveLength(1);
+		expect(brothers[0].person_status).toBe('ACTIVE');
+		expect(brothers[0].family).toHaveLength(1);
+		expect(brothers[0].family[0].status).toBe('ACTIVE');
 	});
 });

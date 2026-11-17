@@ -114,6 +114,7 @@ export function load({ locals, url }) {
 			age: ageOn(f.birth_date, todayPlain),
 			email: f.email || '',
 			phone: f.phone || '',
+			status: f.status || 'ACTIVE',
 			hasAccount: f.hasAccount,
 			knowledge: f.knowledge.map((k) => ({
 				...k,
@@ -173,8 +174,8 @@ export function load({ locals, url }) {
 				email: f.email,
 				phone: f.phone,
 				role: null,
-				status: f.status ?? 'ACTIVE',
-				sleeping: b.sleeping || f.status !== 'ACTIVE',
+				status: f.status || 'ACTIVE',
+				sleeping: Boolean(b.sleeping || (f.status && f.status !== 'ACTIVE')),
 				householdSleeping: b.sleeping,
 				householdBrotherName: b.displayName || b.fullName,
 				householdUserId: b.userId,
