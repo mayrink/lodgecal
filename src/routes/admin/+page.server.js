@@ -122,6 +122,71 @@ export function load({ locals, url }) {
 		}))
 	}));
 
+	const people = [];
+	for (const b of brothers) {
+		people.push({
+			id: `b-${b.userId}`,
+			personId: b.personId,
+			userId: b.userId,
+			membershipId: null,
+			category: 'BROTHER',
+			categoryOrder: 1,
+			categoryLabel: 'Brother',
+			fullName: b.fullName,
+			displayName: b.displayName,
+			gender: b.gender,
+			birthDate: b.birthDate,
+			birthMonthDay: (b.birthDate || '').slice(5),
+			birthShort: b.birthShort,
+			age: b.age,
+			email: b.email,
+			phone: b.phone,
+			role: b.role,
+			status: b.status,
+			sleeping: b.sleeping,
+			householdSleeping: b.sleeping,
+			householdBrotherName: null,
+			householdUserId: b.userId,
+			relationLabel: null,
+			knowledge: b.knowledge,
+			family: b.family,
+			mustChangePassword: b.mustChangePassword
+		});
+
+		for (const f of b.family) {
+			const isSpouse = f.relationship === 'SPOUSE';
+			people.push({
+				id: `f-${f.membershipId}`,
+				personId: f.personId,
+				userId: null,
+				membershipId: f.membershipId,
+				category: isSpouse ? 'SPOUSE' : 'CHILD',
+				categoryOrder: isSpouse ? 2 : 3,
+				categoryLabel: isSpouse ? 'Wife' : 'Child',
+				fullName: f.fullName,
+				displayName: f.fullName,
+				gender: f.gender,
+				birthDate: f.birthDate,
+				birthMonthDay: (f.birthDate || '').slice(5),
+				birthShort: f.birthShort,
+				age: f.age,
+				email: f.email,
+				phone: f.phone,
+				role: null,
+				status: f.status ?? 'ACTIVE',
+				sleeping: b.sleeping || f.status !== 'ACTIVE',
+				householdSleeping: b.sleeping,
+				householdBrotherName: b.displayName || b.fullName,
+				householdUserId: b.userId,
+				relationLabel: f.relationLabel,
+				knowledge: f.knowledge,
+				family: [],
+				mustChangePassword: false
+			});
+		}
+	}
+	people.sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }));
+
 	const events = listEvents(locals.db).map((e) => ({
 		...e,
 		dateFormatted: formatDateShortYear(e.iso_date),
@@ -141,6 +206,7 @@ export function load({ locals, url }) {
 		today: todayPlain.toString(),
 		initialTab,
 		brothers,
+		people,
 		events,
 		types: activeTypes,
 		allTypes: allTypes.filter((t) => !t.derived),

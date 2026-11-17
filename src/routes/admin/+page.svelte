@@ -1,5 +1,7 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { fly, fade } from 'svelte/transition';
+	import { sortableTable } from '$lib/sortable-table.js';
 	import { Temporal, addWeeks, formatDateLongYear } from '$lib/dates.js';
 	import Icon from '$lib/components/Icon.svelte';
 	import Toast from '$lib/components/Toast.svelte';
@@ -8,10 +10,11 @@
 
 	let activeTab = $state('members');
 	let newBrotherOpen = $state(false);
-	let openFamilyUserId = $state(null);
-	let editBrotherUserId = $state(null);
-	let confirmDeleteUserId = $state(null);
-	let editFamilyPersonId = $state(null);
+	let openNotePersonId = $state(null);
+	let editTarget = $state(null);
+	let deleteTarget = $state(null);
+	let deleteDialog;
+	let showAddFamilyMemberInPanel = $state(false);
 	let memberQuery = $state('');
 
 	let newEventOpen = $state(false);
@@ -36,9 +39,6 @@
 				await update();
 				if (result.type === 'success') {
 					newBrotherOpen = false;
-					editBrotherUserId = null;
-					confirmDeleteUserId = null;
-					editFamilyPersonId = null;
 					newEventOpen = false;
 					editEventId = null;
 					toastKey = Temporal.Now.instant().epochMilliseconds;
@@ -47,22 +47,58 @@
 			};
 	}
 
-	const activeBrothersCount = $derived(
-		data.brothers.filter((b) => !b.sleeping).length
+	function openEditPane(person) {
+		editTarget = person;
+		showAddFamilyMemberInPanel = false;
+	}
+
+	function closeEditPane() {
+		editTarget = null;
+		showAddFamilyMemberInPanel = false;
+	}
+
+	function openDeleteModal(person) {
+		deleteTarget = person;
+		deleteDialog?.showModal();
+	}
+
+	function closeDeleteModal() {
+		deleteDialog?.close();
+		deleteTarget = null;
+	}
+
+	function toggleNoteDrawer(personId) {
+		openNotePersonId = openNotePersonId === personId ? null : personId;
+	}
+
+	function onKeydown(event) {
+		if (event.key === 'Escape' && editTarget) {
+			closeEditPane();
+		}
+	}
+
+	const peopleList = $derived(data.people ?? []);
+	const activePeopleCount = $derived(
+		peopleList.filter((p) => !p.sleeping).length
 	);
-	const sleepingBrothersCount = $derived(
-		data.brothers.filter((b) => b.sleeping).length
+	const sleepingPeopleCount = $derived(
+		peopleList.filter((p) => p.sleeping).length
 	);
 
-	const filteredBrothers = $derived.by(() => {
+	const currentEditTarget = $derived(
+		editTarget ? (peopleList.find((p) => p.id === editTarget.id) ?? editTarget) : null
+	);
+
+	const filteredPeople = $derived.by(() => {
 		const q = memberQuery.trim().toLowerCase();
-		if (!q) return data.brothers;
-		return data.brothers.filter(
-			(b) =>
-				b.displayName.toLowerCase().includes(q) ||
-				b.fullName.toLowerCase().includes(q) ||
-				b.email.toLowerCase().includes(q) ||
-				b.family.some((f) => f.fullName.toLowerCase().includes(q))
+		if (!q) return peopleList;
+		return peopleList.filter(
+			(p) =>
+				p.displayName.toLowerCase().includes(q) ||
+				p.fullName.toLowerCase().includes(q) ||
+				p.email.toLowerCase().includes(q) ||
+				p.phone.toLowerCase().includes(q) ||
+				(p.householdBrotherName && p.householdBrotherName.toLowerCase().includes(q))
 		);
 	});
 
@@ -82,6 +118,8 @@
 		return formatDateLongYear(addWeeks(start, Number(weeksValue)));
 	});
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <div class="admin-page">
 	<h1>Lodge administration</h1>
@@ -144,14 +182,14 @@
 			<div class="admin-bar">
 				<div class="admin-bar-left">
 					<p class="admin-counts">
-						{activeBrothersCount} active, {sleepingBrothersCount} sleeping.
+						{activePeopleCount} active, {sleepingPeopleCount} sleeping.
 					</p>
 					<input
 						type="search"
 						class="admin-search"
 						bind:value={memberQuery}
-						placeholder="Filter brothers or family..."
-						aria-label="Filter brothers or family"
+						placeholder="Filter by name, email, phone or brother..."
+						aria-label="Filter people"
 					/>
 				</div>
 				<button
@@ -214,514 +252,187 @@
 				</form>
 			{/if}
 
-			<div class="admin-list-card">
-				{#each filteredBrothers as b (b.userId)}
-					<div class="admin-brother-block">
-						<div class="admin-brother-row">
-							<div class="brother-summary">
-								<div class="brother-title-line">
-									<span class="brother-title" class:sleeping={b.sleeping}
-										>{b.displayName}</span
-									>
-									{#if b.sleeping}
-										<span class="pill"
-											>{b.status === 'DEPARTED' ? 'Departed' : 'Sleeping'}</span
-										>
-									{/if}
-									{#if b.role === 'ADMIN'}
-										<span class="pill tint">Superadmin</span>
-									{/if}
-								</div>
-								<div class="brother-meta-line">
-									{b.email}{#if b.phone} &middot; {b.phone}{/if} &middot; born {b.birthShort} (age {b.age})
-								</div>
-							</div>
-
-							<div class="brother-actions">
-								<button
-									type="button"
-									class="secondary action-btn"
-									aria-expanded={openFamilyUserId === b.userId}
-									onclick={() =>
-										(openFamilyUserId = openFamilyUserId === b.userId ? null : b.userId)}
-								>
-									Family ({b.family.length})
-								</button>
-								<button
-									type="button"
-									class="secondary action-btn"
-									aria-expanded={editBrotherUserId === b.userId}
-									onclick={() =>
-										(editBrotherUserId = editBrotherUserId === b.userId ? null : b.userId)}
-								>
-									{editBrotherUserId === b.userId ? 'Close' : 'Edit'}
-								</button>
-								<form method="POST" action="?/toggleSleep" use:enhance>
-									<input type="hidden" name="csrf" value={data.csrf} />
-									<input type="hidden" name="userId" value={b.userId} />
-									<button type="submit" class="secondary action-btn">
-										{b.sleeping ? 'Reactivate' : 'Mark sleeping'}
-									</button>
-								</form>
-								<button
-									type="button"
-									class="danger-outline action-btn"
-									onclick={() =>
-										(confirmDeleteUserId =
-											confirmDeleteUserId === b.userId ? null : b.userId)}
-								>
-									Delete
-								</button>
-							</div>
-						</div>
-
-						{#if confirmDeleteUserId === b.userId}
-							<div class="delete-confirm-banner">
-								<div class="delete-confirm-text">
-									<strong>Delete {b.displayName}?</strong>
-									{#if b.family.length}
-										His login account will be removed ({b.family.length} family
-										{b.family.length === 1 ? 'member remains' : 'members remain'} on record).
-									{:else}
-										His login account will be removed from the list.
-									{/if}
-									If he is no longer active, mark him as sleeping instead.
-								</div>
-								<div class="delete-confirm-actions">
-									<button
-										type="button"
-										class="secondary action-btn"
-										onclick={() => (confirmDeleteUserId = null)}
-									>
-										Keep
-									</button>
-									<form method="POST" action="?/deleteBrother" use:enhance={enhanceAction()}>
-										<input type="hidden" name="csrf" value={data.csrf} />
-										<input type="hidden" name="userId" value={b.userId} />
-										<button type="submit" class="danger-outline action-btn strong-warn">
-											Delete permanently
-										</button>
-									</form>
-								</div>
-							</div>
-						{/if}
-
-						{#if editBrotherUserId === b.userId}
-							<div class="drawer-panel">
-								<form method="POST" action="?/updateBrother" use:enhance={enhanceAction()}>
-									<input type="hidden" name="csrf" value={data.csrf} />
-									<input type="hidden" name="userId" value={b.userId} />
-									<div class="admin-form-row">
-										<div class="f-col-2">
-											<label class="muted-label" for="eb-name-{b.userId}">Full name</label>
-											<input
-												id="eb-name-{b.userId}"
-												name="fullName"
-												value={b.fullName}
-												required
-											/>
-										</div>
-										<div class="f-col-2">
-											<label class="muted-label" for="eb-email-{b.userId}">Email</label>
-											<input
-												id="eb-email-{b.userId}"
-												name="email"
-												type="email"
-												value={b.email}
-												required
-											/>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="eb-phone-{b.userId}">Phone</label>
-											<input
-												id="eb-phone-{b.userId}"
-												name="phone"
-												type="tel"
-												value={b.phone}
-											/>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="eb-birth-{b.userId}">Birth date</label>
-											<input
-												id="eb-birth-{b.userId}"
-												name="birthDate"
-												type="date"
-												value={b.birthDate}
-												max={data.today}
-												required
-											/>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="eb-gender-{b.userId}">Gender</label>
-											<select id="eb-gender-{b.userId}" name="gender" value={b.gender}>
-												<option value="MALE">Male</option>
-												<option value="FEMALE">Female</option>
-												<option value="OTHER">Other</option>
-											</select>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="eb-role-{b.userId}">Role</label>
-											<select id="eb-role-{b.userId}" name="role" value={b.role}>
-												<option value="USER">USER</option>
-												<option value="ADMIN">ADMIN</option>
-											</select>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="eb-status-{b.userId}">Status</label>
-											<select id="eb-status-{b.userId}" name="status" value={b.status}>
-												<option value="ACTIVE">Active</option>
-												<option value="INACTIVE">Sleeping (Inactive)</option>
-												<option value="DEPARTED">Departed</option>
-											</select>
-										</div>
+			<div class="table-wrap admin-table-wrap">
+				<table use:sortableTable>
+					<thead>
+						<tr>
+							<th scope="col" class="role-column" aria-label="Role">Role</th>
+							<th scope="col">Name</th>
+							<th scope="col">Details</th>
+							<th scope="col" class="actions-column">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each filteredPeople as person (person.id)}
+							<tr
+								class="admin-person-row"
+								class:is-sleeping={person.sleeping}
+							>
+								<td data-sort-value={person.categoryOrder} class="role-cell">
+									<span
+										class="role-dot dot-{person.category.toLowerCase()}"
+										title={person.categoryLabel}
+										aria-label={person.categoryLabel}
+									></span>
+								</td>
+								<td data-sort-value={person.fullName}>
+									<div class="name-cell">
+										<span class="person-name" class:sleeping={person.sleeping}>
+											{person.displayName}
+										</span>
+										{#if person.role === 'ADMIN'}
+											<span class="pill tint">Superadmin</span>
+										{/if}
+										{#if person.sleeping}
+											<span class="pill">{person.status === 'DEPARTED' ? 'Departed' : 'Sleeping'}</span>
+										{/if}
 									</div>
-									<div class="drawer-actions-bar">
-										<button type="submit">Save brother</button>
+								</td>
+								<td data-sort-value={person.birthMonthDay}>
+									<div class="meta-cell">
+										{#if person.category === 'SPOUSE' && person.householdBrotherName}
+											<span class="household-badge">{person.relationLabel || 'Wife'} of {person.householdBrotherName}</span>
+											<span class="sep">&middot;</span>
+										{:else if person.category === 'CHILD' && person.householdBrotherName}
+											<span class="household-badge">{person.relationLabel || (person.gender === 'FEMALE' ? 'Daughter' : person.gender === 'MALE' ? 'Son' : 'Child')} of {person.householdBrotherName}</span>
+											<span class="sep">&middot;</span>
+										{/if}
+										{#if person.email}<span>{person.email}</span><span class="sep">&middot;</span>{/if}
+										{#if person.phone}<span>{person.phone}</span><span class="sep">&middot;</span>{/if}
+										<span class="bday-text">born {person.birthShort} (age {person.age})</span>
+									</div>
+								</td>
+								<td class="row-actions">
+									<div class="action-icons">
+										<a
+											class="icon-button"
+											href="/people/{person.personId}"
+											aria-label="View {person.fullName}"
+											title="View profile"
+										>
+											<Icon name="eye" />
+										</a>
 										<button
 											type="button"
-											class="secondary"
-											onclick={() => (editBrotherUserId = null)}
+											class="icon-button"
+											onclick={() => openEditPane(person)}
+											aria-label="Edit {person.fullName}"
+											title="Edit"
 										>
-											Cancel
+											<Icon name="edit" />
+										</button>
+										<button
+											type="button"
+											class="icon-button"
+											class:active-note-btn={openNotePersonId === person.personId}
+											onclick={() => toggleNoteDrawer(person.personId)}
+											aria-label="Birthday notes for {person.fullName}"
+											title="Birthday notes ({person.knowledge.length})"
+											aria-expanded={openNotePersonId === person.personId}
+										>
+											<Icon name="tag" />
+										</button>
+										{#if person.category === 'BROTHER'}
+											<form method="POST" action="?/toggleSleep" use:enhance>
+												<input type="hidden" name="csrf" value={data.csrf} />
+												<input type="hidden" name="userId" value={person.userId} />
+												<button
+													type="submit"
+													class="icon-button sleep-btn"
+													class:is-sleeping={person.sleeping}
+													aria-pressed={person.sleeping}
+													aria-label={person.sleeping ? `Wake ${person.fullName}` : `Mark ${person.fullName} sleeping`}
+													title={person.sleeping ? 'Sleeping (click to reactivate)' : 'Active (click to mark sleeping)'}
+												>
+													<Icon name="moon" />
+												</button>
+											</form>
+										{:else}
+											<span class="icon-placeholder" aria-hidden="true"></span>
+										{/if}
+										<button
+											type="button"
+											class="icon-button danger-icon-btn"
+											onclick={() => openDeleteModal(person)}
+											aria-label="Delete {person.fullName}"
+											title="Delete"
+										>
+											<Icon name="trash" />
 										</button>
 									</div>
-								</form>
+								</td>
+							</tr>
 
-								<div class="password-reset-strip">
-									<span class="muted">
-										Need to reset {b.displayName}'s sign-in password?
-									</span>
-									<form method="POST" action="?/resetPassword" use:enhance>
-										<input type="hidden" name="csrf" value={data.csrf} />
-										<input type="hidden" name="userId" value={b.userId} />
-										<button type="submit" class="secondary action-btn">
-											Issue temporary password
-										</button>
-									</form>
-								</div>
-							</div>
-						{/if}
-
-						{#if openFamilyUserId === b.userId}
-							<div class="drawer-panel">
-								<div class="drawer-subsection">
-									<div class="drawer-subtitle">
-										Birthday notes for {b.displayName}
-									</div>
-									{#if b.knowledge.length}
-										<div class="drawer-notes-pills">
-											{#each b.knowledge as k (k.id)}
-												<span class="drawer-note-tag">
-													<span>{k.body}</span>
-													<small class="muted">({k.dateFormatted})</small>
-													<form method="POST" action="?/removeNote" use:enhance>
-														<input type="hidden" name="csrf" value={data.csrf} />
-														<input type="hidden" name="knowledgeId" value={k.id} />
-														<button
-															type="submit"
-															class="tag-remove-btn"
-															aria-label="Remove note"
-															title="Remove note">&times;</button
-														>
-													</form>
-												</span>
-											{/each}
-										</div>
-									{/if}
-									<form
-										method="POST"
-										action="?/addNote"
-										class="compact-note-form"
-										use:enhance={() => {
-											return async ({ result, update }) => {
-												await update({ reset: result.type === 'success' });
-											};
-										}}
-									>
-										<input type="hidden" name="csrf" value={data.csrf} />
-										<input type="hidden" name="personId" value={b.personId} />
-										<input
-											name="body"
-											type="text"
-											placeholder="Add a birthday note for {b.fullName}..."
-											required
-										/>
-										<input
-											name="effectiveDate"
-											type="date"
-											value={data.today}
-											class="compact-date"
-											required
-										/>
-										<button type="submit" class="secondary action-btn">Add note</button>
-									</form>
-								</div>
-
-								<div class="drawer-subsection">
-									<div class="drawer-subtitle">Household members</div>
-									{#if b.family.length}
-										<ul class="admin-fam-list">
-											{#each b.family as f (f.membershipId)}
-												<li class="admin-fam-item">
-													<div class="admin-fam-line">
-														<div>
-															<strong>{f.fullName}</strong>
-															<span class="muted"> {f.relationLabel}</span>
-														</div>
-														<div class="admin-fam-right">
-															<span class="muted"
-																>{f.birthShort} (age {f.age})</span
-															>
-															<button
-																type="button"
-																class="secondary small-btn"
-																onclick={() =>
-																	(editFamilyPersonId =
-																		editFamilyPersonId === f.personId
-																			? null
-																			: f.personId)}
-															>
-																{editFamilyPersonId === f.personId
-																	? 'Close'
-																	: 'Edit'}
-															</button>
-															<form
-																method="POST"
-																action="?/removeFamilyMember"
-																use:enhance
-															>
-																<input
-																	type="hidden"
-																	name="csrf"
-																	value={data.csrf}
-																/>
-																<input
-																	type="hidden"
-																	name="membershipId"
-																	value={f.membershipId}
-																/>
-																<button
-																	type="submit"
-																	class="danger-outline small-btn"
-																>
-																	Delete
-																</button>
+							{#if openNotePersonId === person.personId}
+								<tr class="inline-note-row">
+									<td colspan="4">
+										<div class="inline-note-drawer">
+											<div class="note-drawer-header">
+												<strong>Birthday notes for {person.displayName}</strong>
+												<button
+													type="button"
+													class="tag-close-btn"
+													onclick={() => (openNotePersonId = null)}
+													aria-label="Close notes"
+												>&times;</button>
+											</div>
+											{#if person.knowledge.length}
+												<div class="drawer-notes-pills">
+													{#each person.knowledge as k (k.id)}
+														<span class="drawer-note-tag">
+															<span>{k.body}</span>
+															<small class="muted">({k.dateFormatted})</small>
+															<form method="POST" action="?/removeNote" use:enhance>
+																<input type="hidden" name="csrf" value={data.csrf} />
+																<input type="hidden" name="knowledgeId" value={k.id} />
+																<button type="submit" class="tag-remove-btn" aria-label="Remove note">&times;</button>
 															</form>
-														</div>
-													</div>
-
-													{#if editFamilyPersonId === f.personId}
-														<form
-															method="POST"
-															action="?/updateFamilyMember"
-															class="fam-edit-box"
-															use:enhance
-														>
-															<input type="hidden" name="csrf" value={data.csrf} />
-															<input
-																type="hidden"
-																name="personId"
-																value={f.personId}
-															/>
-															<div class="admin-form-row">
-																<div class="f-col-2">
-																	<label
-																		class="muted-label"
-																		for="ef-name-{f.personId}">Full name</label
-																	>
-																	<input
-																		id="ef-name-{f.personId}"
-																		name="fullName"
-																		value={f.fullName}
-																		required
-																	/>
-																</div>
-																<div class="f-col-1">
-																	<label
-																		class="muted-label"
-																		for="ef-birth-{f.personId}">Birth date</label
-																	>
-																	<input
-																		id="ef-birth-{f.personId}"
-																		name="birthDate"
-																		type="date"
-																		value={f.birthDate}
-																		max={data.today}
-																		required
-																	/>
-																</div>
-																<div class="f-col-1">
-																	<label
-																		class="muted-label"
-																		for="ef-gender-{f.personId}">Gender</label
-																	>
-																	<select
-																		id="ef-gender-{f.personId}"
-																		name="gender"
-																		value={f.gender}
-																	>
-																		<option value="FEMALE">Female</option>
-																		<option value="MALE">Male</option>
-																		<option value="OTHER">Other</option>
-																	</select>
-																</div>
-																<div class="f-col-1">
-																	<label
-																		class="muted-label"
-																		for="ef-phone-{f.personId}">Phone</label
-																	>
-																	<input
-																		id="ef-phone-{f.personId}"
-																		name="phone"
-																		value={f.phone}
-																	/>
-																</div>
-																<div class="f-col-1">
-																	<label
-																		class="muted-label"
-																		for="ef-email-{f.personId}">Email</label
-																	>
-																	<input
-																		id="ef-email-{f.personId}"
-																		name="email"
-																		type="email"
-																		value={f.email}
-																	/>
-																</div>
-															</div>
-															<div class="drawer-actions-bar">
-																<button type="submit" class="action-btn">Save</button>
-															</div>
-														</form>
-													{/if}
-
-													{#if f.knowledge.length}
-														<div class="drawer-notes-pills" style="margin-top:0.5rem">
-															{#each f.knowledge as k (k.id)}
-																<span class="drawer-note-tag">
-																	<span>{k.body}</span>
-																	<small class="muted">({k.dateFormatted})</small>
-																	<form
-																		method="POST"
-																		action="?/removeNote"
-																		use:enhance
-																	>
-																		<input
-																			type="hidden"
-																			name="csrf"
-																			value={data.csrf}
-																		/>
-																		<input
-																			type="hidden"
-																			name="knowledgeId"
-																			value={k.id}
-																		/>
-																		<button
-																			type="submit"
-																			class="tag-remove-btn"
-																			aria-label="Remove note"
-																			>&times;</button
-																		>
-																	</form>
-																</span>
-															{/each}
-														</div>
-													{/if}
-													<form
-														method="POST"
-														action="?/addNote"
-														class="compact-note-form"
-														style="margin-top:0.5rem"
-														use:enhance={() => {
-															return async ({ result, update }) => {
-																await update({ reset: result.type === 'success' });
-															};
-														}}
-													>
-														<input type="hidden" name="csrf" value={data.csrf} />
-														<input type="hidden" name="personId" value={f.personId} />
-														<input
-															name="body"
-															type="text"
-															placeholder="Add a birthday note for {f.fullName}..."
-															required
-														/>
-														<input
-															name="effectiveDate"
-															type="date"
-															value={data.today}
-															class="compact-date"
-															required
-														/>
-														<button type="submit" class="secondary small-btn"
-															>Add note</button
-														>
-													</form>
-												</li>
-											{/each}
-										</ul>
-									{:else}
-										<div class="muted" style="margin-bottom:1rem;font-size:0.875rem">
-											No family members yet.
-										</div>
-									{/if}
-
-									<form
-										method="POST"
-										action="?/addFamilyMember"
-										class="admin-form-row"
-										style="align-items:flex-end"
-										use:enhance={() => {
-											return async ({ result, update }) => {
-												await update({ reset: result.type === 'success' });
-											};
-										}}
-									>
-										<input type="hidden" name="csrf" value={data.csrf} />
-										<input type="hidden" name="userId" value={b.userId} />
-										<div class="f-col-2">
-											<label class="muted-label" for="fn-{b.userId}"
-												>New family member</label
+														</span>
+													{/each}
+												</div>
+											{:else}
+												<p class="muted empty-note-hint">No birthday notes recorded yet.</p>
+											{/if}
+											<form
+												method="POST"
+												action="?/addNote"
+												class="compact-note-form"
+												use:enhance={() => {
+													return async ({ result, update }) => {
+														await update({ reset: result.type === 'success' });
+													};
+												}}
 											>
-											<input
-												id="fn-{b.userId}"
-												name="fullName"
-												type="text"
-												placeholder="Full name"
-												required
-											/>
+												<input type="hidden" name="csrf" value={data.csrf} />
+												<input type="hidden" name="personId" value={person.personId} />
+												<input
+													name="body"
+													type="text"
+													placeholder="Add a birthday note for {person.fullName}..."
+													required
+												/>
+												<input
+													name="effectiveDate"
+													type="date"
+													value={data.today}
+													class="compact-date"
+													required
+												/>
+												<button type="submit" class="secondary action-btn">Add note</button>
+											</form>
 										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="fr-{b.userId}">Relation</label>
-											<select id="fr-{b.userId}" name="relationChoice">
-												<option value="Wife">Wife</option>
-												<option value="Son">Son</option>
-												<option value="Daughter">Daughter</option>
-												<option value="Spouse">Spouse</option>
-												<option value="Child">Child</option>
-											</select>
-										</div>
-										<div class="f-col-1">
-											<label class="muted-label" for="fb-{b.userId}">Birth date</label>
-											<input
-												id="fb-{b.userId}"
-												name="birthDate"
-												type="date"
-												max={data.today}
-												required
-											/>
-										</div>
-										<div>
-											<button type="submit" class="action-btn">Add</button>
-										</div>
-									</form>
-								</div>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<div class="empty-admin-rows">No brothers match that filter.</div>
-				{/each}
+									</td>
+								</tr>
+							{/if}
+						{:else}
+							<tr>
+								<td colspan="4" class="empty-people">
+									No person matches that filter.
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		</section>
 	{/if}
@@ -1172,6 +883,342 @@
 	{/if}
 </div>
 
+{#if currentEditTarget}
+	<button
+		type="button"
+		class="slide-scrim"
+		aria-label="Close edit pane"
+		onclick={closeEditPane}
+		transition:fade={{ duration: 140 }}
+	></button>
+	<aside
+		class="slide-pane"
+		aria-label="Edit {currentEditTarget.displayName}"
+		transition:fly={{ x: 380, duration: 180 }}
+	>
+		<div class="pane-header">
+			<div>
+				<h2>{currentEditTarget.category === 'BROTHER' ? 'Edit brother' : 'Edit family member'}</h2>
+				<p class="muted" style="margin:0.15rem 0 0;font-size:0.875rem">{currentEditTarget.displayName}</p>
+			</div>
+			<button
+				type="button"
+				class="icon-button"
+				onclick={closeEditPane}
+				aria-label="Close pane"
+				title="Close"
+			>
+				<Icon name="close" />
+			</button>
+		</div>
+
+		{#if currentEditTarget.category === 'BROTHER'}
+			<form
+				method="POST"
+				action="?/updateBrother"
+				class="stack pane-form"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') {
+							closeEditPane();
+							toastKey = Temporal.Now.instant().epochMilliseconds;
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="csrf" value={data.csrf} />
+				<input type="hidden" name="userId" value={currentEditTarget.userId} />
+
+				<div>
+					<label for="eb-name">Full name</label>
+					<input id="eb-name" name="fullName" value={currentEditTarget.fullName} required />
+				</div>
+				<div>
+					<label for="eb-email">Email</label>
+					<input id="eb-email" name="email" type="email" value={currentEditTarget.email} required />
+				</div>
+				<div>
+					<label for="eb-phone">Phone</label>
+					<input id="eb-phone" name="phone" type="tel" value={currentEditTarget.phone} />
+				</div>
+				<div class="field-grid">
+					<div class="field">
+						<label for="eb-birth">Birth date</label>
+						<input id="eb-birth" name="birthDate" type="date" value={currentEditTarget.birthDate} max={data.today} required />
+					</div>
+					<div class="field">
+						<label for="eb-gender">Gender</label>
+						<select id="eb-gender" name="gender" value={currentEditTarget.gender}>
+							<option value="MALE">Male</option>
+							<option value="FEMALE">Female</option>
+							<option value="OTHER">Other</option>
+						</select>
+					</div>
+					<div class="field">
+						<label for="eb-role">Role</label>
+						<select id="eb-role" name="role" value={currentEditTarget.role}>
+							<option value="USER">USER</option>
+							<option value="ADMIN">ADMIN</option>
+						</select>
+					</div>
+					<div class="field">
+						<label for="eb-status">Status</label>
+						<select id="eb-status" name="status" value={currentEditTarget.status}>
+							<option value="ACTIVE">Active</option>
+							<option value="INACTIVE">Sleeping (Inactive)</option>
+							<option value="DEPARTED">Departed</option>
+						</select>
+					</div>
+				</div>
+
+				<div class="pane-footer">
+					<button type="button" class="secondary" onclick={closeEditPane}>Cancel</button>
+					<button type="submit">Save brother</button>
+				</div>
+			</form>
+
+			<div class="pane-section">
+				<div class="pane-section-header">
+					<h3>Household members ({currentEditTarget.family.length})</h3>
+					<button
+						type="button"
+						class="secondary small-btn"
+						onclick={() => (showAddFamilyMemberInPanel = !showAddFamilyMemberInPanel)}
+					>
+						{showAddFamilyMemberInPanel ? 'Cancel' : '+ Add family member'}
+					</button>
+				</div>
+
+				{#if showAddFamilyMemberInPanel}
+					<form
+						method="POST"
+						action="?/addFamilyMember"
+						class="stack inline-add-family"
+						use:enhance={() => {
+							return async ({ result, update }) => {
+								await update();
+								if (result.type === 'success') {
+									showAddFamilyMemberInPanel = false;
+									toastKey = Temporal.Now.instant().epochMilliseconds;
+								}
+							};
+						}}
+					>
+						<input type="hidden" name="csrf" value={data.csrf} />
+						<input type="hidden" name="userId" value={currentEditTarget.userId} />
+						<div>
+							<label class="muted-label" for="afm-name">Full name</label>
+							<input id="afm-name" name="fullName" required placeholder="Full name" />
+						</div>
+						<div class="field-grid">
+							<div class="field">
+								<label class="muted-label" for="afm-relation">Relation</label>
+								<select id="afm-relation" name="relationChoice">
+									<option value="Wife">Wife</option>
+									<option value="Son">Son</option>
+									<option value="Daughter">Daughter</option>
+									<option value="Spouse">Spouse</option>
+									<option value="Child">Child</option>
+								</select>
+							</div>
+							<div class="field">
+								<label class="muted-label" for="afm-birth">Birth date</label>
+								<input id="afm-birth" name="birthDate" type="date" max={data.today} required />
+							</div>
+						</div>
+						<div style="display:flex;justify-content:flex-end;margin-top:0.5rem">
+							<button type="submit" class="small-btn">Add to household</button>
+						</div>
+					</form>
+				{/if}
+
+				{#if currentEditTarget.family.length}
+					<ul class="pane-fam-list">
+						{#each currentEditTarget.family as f (f.membershipId)}
+							<li class="pane-fam-item">
+								<div>
+									<strong>{f.fullName}</strong>
+									<span class="muted"> ({f.relationLabel})</span>
+									<div class="muted" style="font-size:0.8125rem">
+										born {f.birthShort} (age {f.age})
+									</div>
+								</div>
+								<form method="POST" action="?/removeFamilyMember" use:enhance>
+									<input type="hidden" name="csrf" value={data.csrf} />
+									<input type="hidden" name="membershipId" value={f.membershipId} />
+									<button type="submit" class="danger-outline small-btn">Remove</button>
+								</form>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="muted" style="font-size:0.875rem;margin:0.5rem 0 0">No family members registered yet.</p>
+				{/if}
+			</div>
+
+			<div class="pane-section password-reset-strip">
+				<span class="muted">
+					Need to reset {currentEditTarget.displayName}'s sign-in password?
+				</span>
+				<form method="POST" action="?/resetPassword" use:enhance>
+					<input type="hidden" name="csrf" value={data.csrf} />
+					<input type="hidden" name="userId" value={currentEditTarget.userId} />
+					<button type="submit" class="secondary action-btn">
+						Issue temporary password
+					</button>
+				</form>
+			</div>
+		{:else}
+			<form
+				method="POST"
+				action="?/updateFamilyMember"
+				class="stack pane-form"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') {
+							closeEditPane();
+							toastKey = Temporal.Now.instant().epochMilliseconds;
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="csrf" value={data.csrf} />
+				<input type="hidden" name="personId" value={currentEditTarget.personId} />
+
+				{#if currentEditTarget.householdBrotherName}
+					<div class="gold-callout" style="padding:0.75rem 1rem;font-size:0.875rem;margin-bottom:1rem">
+						Belongs to the household of <strong>{currentEditTarget.householdBrotherName}</strong>.
+					</div>
+				{/if}
+
+				<div>
+					<label for="ef-name">Full name</label>
+					<input id="ef-name" name="fullName" value={currentEditTarget.fullName} required />
+				</div>
+				<div class="field-grid">
+					<div class="field">
+						<label for="ef-birth">Birth date</label>
+						<input id="ef-birth" name="birthDate" type="date" value={currentEditTarget.birthDate} max={data.today} required />
+					</div>
+					<div class="field">
+						<label for="ef-gender">Gender</label>
+						<select id="ef-gender" name="gender" value={currentEditTarget.gender}>
+							<option value="FEMALE">Female</option>
+							<option value="MALE">Male</option>
+							<option value="OTHER">Other</option>
+						</select>
+					</div>
+				</div>
+				<div>
+					<label for="ef-phone">Phone</label>
+					<input id="ef-phone" name="phone" type="tel" value={currentEditTarget.phone} />
+				</div>
+				<div>
+					<label for="ef-email">Email</label>
+					<input id="ef-email" name="email" type="email" value={currentEditTarget.email} />
+				</div>
+
+				<div class="pane-footer">
+					<button type="button" class="secondary" onclick={closeEditPane}>Cancel</button>
+					<button type="submit">Save changes</button>
+				</div>
+			</form>
+		{/if}
+	</aside>
+{/if}
+
+<dialog
+	bind:this={deleteDialog}
+	class="modal-dialog purge-modal"
+	onclose={() => (deleteTarget = null)}
+>
+	<div class="modal-heading">
+		<h2>{deleteTarget?.category === 'BROTHER' ? 'Delete brother?' : 'Remove family member?'}</h2>
+		<button
+			type="button"
+			class="icon-button"
+			onclick={closeDeleteModal}
+			aria-label="Cancel and close"
+		>
+			<Icon name="close" />
+		</button>
+	</div>
+
+	{#if deleteTarget}
+		{#if deleteTarget.category === 'BROTHER'}
+			<div class="purge-warning-box">
+				<p style="margin:0 0 0.75rem">
+					You are about to delete <strong>{deleteTarget.displayName}</strong>.
+				</p>
+				<p style="margin:0">
+					His login account will be removed.
+					{#if deleteTarget.family?.length}
+						His {deleteTarget.family.length} family {deleteTarget.family.length === 1 ? 'member remains' : 'members remain'} on record.
+					{/if}
+					If he is simply taking leave from lodge activity, mark him as <strong>sleeping</strong> instead.
+				</p>
+			</div>
+
+			<form
+				method="POST"
+				action="?/deleteBrother"
+				class="stack"
+				style="margin-top:1.25rem"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') {
+							closeDeleteModal();
+							toastKey = Temporal.Now.instant().epochMilliseconds;
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="csrf" value={data.csrf} />
+				<input type="hidden" name="userId" value={deleteTarget.userId} />
+
+				<div class="modal-actions">
+					<button type="button" class="secondary" onclick={closeDeleteModal}>Cancel</button>
+					<button type="submit" class="danger">Delete brother</button>
+				</div>
+			</form>
+		{:else}
+			<div class="purge-warning-box">
+				<p style="margin:0">
+					Remove <strong>{deleteTarget.fullName}</strong> from the household of
+					<strong>{deleteTarget.householdBrotherName}</strong>?
+				</p>
+			</div>
+
+			<form
+				method="POST"
+				action="?/removeFamilyMember"
+				class="stack"
+				style="margin-top:1.25rem"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') {
+							closeDeleteModal();
+							toastKey = Temporal.Now.instant().epochMilliseconds;
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="csrf" value={data.csrf} />
+				<input type="hidden" name="membershipId" value={deleteTarget.membershipId} />
+
+				<div class="modal-actions">
+					<button type="button" class="secondary" onclick={closeDeleteModal}>Cancel</button>
+					<button type="submit" class="danger">Remove member</button>
+				</div>
+			</form>
+		{/if}
+	{/if}
+</dialog>
+
 <style>
 	.admin-page {
 		max-width: 1100px;
@@ -1343,62 +1390,6 @@
 		font-size: 0.8125rem;
 	}
 
-	.delete-confirm-banner {
-		margin: 0 1.5rem 1rem;
-		padding: 1rem 1.25rem;
-		background: var(--warntint);
-		border: 1px solid var(--warn);
-		border-radius: 10px;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.75rem 1.25rem;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.delete-confirm-text {
-		flex: 1 1 20rem;
-		font-size: 0.875rem;
-		line-height: 1.5;
-	}
-
-	.delete-confirm-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.strong-warn {
-		border-width: 2px;
-		font-weight: 600;
-		background: var(--surface);
-	}
-
-	.drawer-panel {
-		margin: 0 1.5rem 1.25rem;
-		padding: 1.125rem 1.25rem;
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-	}
-
-	.drawer-subsection + .drawer-subsection {
-		margin-top: 1.25rem;
-		padding-top: 1.125rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.drawer-subtitle {
-		font-size: 0.875rem;
-		font-weight: 600;
-		margin-bottom: 0.625rem;
-	}
-
-	.drawer-actions-bar {
-		display: flex;
-		gap: 0.625rem;
-		margin-top: 1rem;
-	}
-
 	.password-reset-strip {
 		margin-top: 1rem;
 		padding-top: 1rem;
@@ -1463,42 +1454,6 @@
 		background: var(--surface);
 	}
 
-	.admin-fam-list {
-		list-style: none;
-		margin: 0 0 1rem;
-		padding: 0;
-	}
-
-	.admin-fam-item {
-		padding: 0.75rem 0;
-		border-bottom: 1px solid var(--border);
-		font-size: 0.9375rem;
-	}
-
-	.admin-fam-line {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem 1rem;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.admin-fam-right {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-	}
-
-	.fam-edit-box {
-		margin-top: 0.75rem;
-		padding: 0.875rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-	}
-
 	.empty-admin-rows {
 		padding: 1.75rem 1.5rem;
 		color: var(--text2);
@@ -1553,5 +1508,250 @@
 		background: var(--tint);
 		border-radius: 10px;
 		font-size: 0.875rem;
+	}
+
+	/* Admin Registry Table & Role Dots */
+	.admin-table-wrap {
+		margin-top: 1.25rem;
+	}
+
+	.role-column {
+		width: 3.5rem;
+		text-align: center;
+	}
+
+	.role-cell {
+		text-align: center;
+		vertical-align: middle;
+		padding: 0.75rem 0.5rem;
+	}
+
+	.role-dot {
+		display: inline-block;
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		vertical-align: middle;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+	}
+
+	.role-dot.dot-brother {
+		background-color: #2563EB;
+	}
+
+	.role-dot.dot-spouse {
+		background-color: #A855F7;
+	}
+
+	.role-dot.dot-child {
+		background-color: #EAB308;
+	}
+
+	.admin-person-row.is-sleeping {
+		opacity: 0.62;
+	}
+
+	.admin-person-row.is-sleeping .person-name {
+		color: var(--text2);
+	}
+
+	.name-cell {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.person-name {
+		font-weight: 600;
+		font-size: 1rem;
+	}
+
+	.meta-cell {
+		font-size: 0.875rem;
+		color: var(--text2);
+		line-height: 1.5;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.household-badge {
+		color: var(--accent);
+		font-weight: 500;
+	}
+
+	.sep {
+		color: var(--border);
+	}
+
+	.bday-text {
+		white-space: nowrap;
+	}
+
+	.action-icons {
+		display: inline-flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem;
+	}
+
+	.icon-placeholder {
+		display: inline-block;
+		width: 2.75rem;
+		min-width: 2.75rem;
+		height: 2.75rem;
+	}
+
+	.sleep-btn.is-sleeping {
+		background: var(--goldtint);
+		border-color: var(--accent);
+		color: var(--text);
+	}
+
+	.active-note-btn {
+		background: var(--tint);
+		border-color: var(--border);
+		color: var(--text);
+	}
+
+	.danger-icon-btn {
+		color: var(--warn);
+	}
+
+	.danger-icon-btn:hover {
+		background: var(--warntint);
+		border-color: var(--warn);
+		color: var(--warn);
+	}
+
+	.inline-note-row td {
+		padding: 0;
+		background: var(--tint);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.inline-note-drawer {
+		padding: 1rem 1.5rem 1.25rem;
+	}
+
+	.note-drawer-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.5rem;
+		font-size: 0.875rem;
+	}
+
+	.tag-close-btn {
+		background: transparent;
+		border: none;
+		font-size: 1.25rem;
+		cursor: pointer;
+		color: var(--text2);
+		line-height: 1;
+		padding: 0.2rem 0.5rem;
+	}
+
+	.tag-close-btn:hover {
+		color: var(--text);
+	}
+
+	.empty-note-hint {
+		font-size: 0.8125rem;
+		margin: 0.25rem 0 0.5rem;
+		color: var(--text2);
+	}
+
+	.empty-people {
+		padding: 2rem 1.5rem;
+		color: var(--text2);
+		text-align: center;
+	}
+
+	/* Slide Panel & Modal Extras */
+	.pane-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid var(--border);
+		margin-bottom: 1.25rem;
+	}
+
+	.pane-header h2 {
+		margin: 0;
+	}
+
+	.pane-form {
+		flex: 1;
+	}
+
+	.pane-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		margin-top: 1.5rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.pane-section {
+		margin-top: 1.5rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.pane-section-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.pane-section-header h3 {
+		margin: 0;
+		font-size: 1rem;
+	}
+
+	.pane-fam-list {
+		list-style: none;
+		margin: 0.5rem 0 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.pane-fam-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.6rem 0.75rem;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		font-size: 0.875rem;
+	}
+
+	.inline-add-family {
+		padding: 0.875rem 1rem;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		margin-bottom: 0.75rem;
+	}
+
+	.purge-warning-box {
+		margin-top: 1rem;
+		padding: 1rem 1.25rem;
+		background: var(--warntint);
+		border: 1px solid var(--warn);
+		border-radius: 10px;
+		font-size: 0.9375rem;
+		line-height: 1.55;
 	}
 </style>
