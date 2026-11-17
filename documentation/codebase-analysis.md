@@ -1,5 +1,7 @@
 # LodgeCal Codebase & UI Analysis
 
+> **Status note (2026-11-17):** this document is a point-in-time analysis written before several later changes. Since then: the leftover scaffold in `src/routes/demo/` and `src/lib/vitest-examples/` was removed; UI localization (English, pt-BR, Spanish) was added in `src/lib/i18n.js` and `src/lib/locales/`; a unified `/admin` people registry and a `/brothers` directory were added; all dates go through Temporal; the project moved to pnpm and the AGPL-3.0-or-later license; and `pnpm reset-password <email>` (`scripts/reset-password.js`) provides command-line recovery for locked-out users. Items in sections 4 and 5 below have not all been re-verified; treat them as leads, not current facts.
+
 ## 1. Purpose & Core Concept
 
 **LodgeCal** is a self-hosted, single-Lodge web application that replaces a Masonic Lodge’s birthday and milestone spreadsheet. It is designed for the Lodge **Chancellor** (or equivalent officer, `ADMIN` role) and **Lodge Brothers** (`USER` role):

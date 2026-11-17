@@ -37,8 +37,8 @@ LodgeCal is published as open source. Future work should keep this in mind: no r
 - Security: Argon2id password hashing, forced password change at first login, opaque server-side sessions (HttpOnly/SameSite cookies), CSRF protection, failed-login throttling, and an audit log of logins and material changes.
 - Regular users (USER role) can create family members and edit their own household, but only an admin can remove one — enforced server-side, not just by hiding a button.
 - Regular users can view the active Brothers directory (name, birthday day/month, contact info), but have zero visibility into other Brothers' family members, private notes, ages, or sleeping/departed status.
-- The interface language is English today, by the original author's working preference, even though the Lodge this instance serves is Brazilian and the intended eventual language is Brazilian Portuguese. Localization (pt-BR, with English likely kept as a second language) is planned but not yet built — treat any stray non-English string in the current UI as unfinished copy to fix now, not as evidence that i18n has already started.
-- Explicitly out of scope for *this build* (not necessarily forever): multi-Lodge tenancy, a full i18n/locale-switching framework, messaging, file/image uploads stored in the app, a public calendar, and a general family tree.
+- The interface is localized in English, Brazilian Portuguese (pt-BR), and Spanish (`src/lib/i18n.js`, `src/lib/locales/*.json`), with the locale stored in a cookie and Lodge terminology (e.g. `Bro∴`, `Ir∴`) localized per language. Any hard-coded user-facing string should be moved into the locale files.
+- Explicitly out of scope for *this build* (not necessarily forever): multi-Lodge tenancy, messaging, file/image uploads stored in the app, a public calendar, and a general family tree.
 
 ## Brand Commitments
 
