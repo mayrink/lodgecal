@@ -275,7 +275,7 @@
 										aria-label={person.categoryLabel}
 									></span>
 								</td>
-								<td data-sort-value={person.fullName}>
+								<td data-sort-value={person.fullName} class="name-column">
 									<div class="name-cell">
 										<span class="person-name" class:sleeping={person.sleeping}>
 											{person.displayName}
@@ -283,23 +283,42 @@
 										{#if person.role === 'ADMIN'}
 											<span class="pill tint">Superadmin</span>
 										{/if}
-										{#if person.sleeping}
-											<span class="pill">{person.status === 'DEPARTED' ? 'Departed' : 'Sleeping'}</span>
+										{#if person.status === 'DEPARTED'}
+											<span class="pill">Departed</span>
 										{/if}
 									</div>
 								</td>
-								<td data-sort-value={person.birthMonthDay}>
+								<td data-sort-value={person.birthMonthDay} class="details-column">
 									<div class="meta-cell">
 										{#if person.category === 'SPOUSE' && person.householdBrotherName}
-											<span class="household-badge">{person.relationLabel || 'Wife'} of {person.householdBrotherName}</span>
-											<span class="sep">&middot;</span>
+											<div class="meta-top-line">
+												<span class="household-badge">{person.relationLabel || 'Wife'} of {person.householdBrotherName}</span>
+											</div>
+											<div class="meta-sub-line">
+												{#if person.email}<span>{person.email}</span><span class="sep">&middot;</span>{/if}
+												{#if person.phone}<span>{person.phone}</span><span class="sep">&middot;</span>{/if}
+												<span class="bday-text">born {person.birthShort} (age {person.age})</span>
+											</div>
 										{:else if person.category === 'CHILD' && person.householdBrotherName}
-											<span class="household-badge">{person.relationLabel || (person.gender === 'FEMALE' ? 'Daughter' : person.gender === 'MALE' ? 'Son' : 'Child')} of {person.householdBrotherName}</span>
-											<span class="sep">&middot;</span>
+											<div class="meta-top-line">
+												<span class="household-badge">{person.relationLabel || (person.gender === 'FEMALE' ? 'Daughter' : person.gender === 'MALE' ? 'Son' : 'Child')} of {person.householdBrotherName}</span>
+											</div>
+											<div class="meta-sub-line">
+												{#if person.email}<span>{person.email}</span><span class="sep">&middot;</span>{/if}
+												{#if person.phone}<span>{person.phone}</span><span class="sep">&middot;</span>{/if}
+												<span class="bday-text">born {person.birthShort} (age {person.age})</span>
+											</div>
+										{:else}
+											<div class="meta-top-line">
+												{#if person.email}<span>{person.email}</span>{/if}
+												{#if person.email && person.phone}<span class="sep">&middot;</span>{/if}
+												{#if person.phone}<span>{person.phone}</span>{/if}
+												{#if !person.email && !person.phone}<span class="muted">No contact info</span>{/if}
+											</div>
+											<div class="meta-sub-line">
+												<span class="bday-text">born {person.birthShort} (age {person.age})</span>
+											</div>
 										{/if}
-										{#if person.email}<span>{person.email}</span><span class="sep">&middot;</span>{/if}
-										{#if person.phone}<span>{person.phone}</span><span class="sep">&middot;</span>{/if}
-										<span class="bday-text">born {person.birthShort} (age {person.age})</span>
 									</div>
 								</td>
 								<td class="row-actions">
@@ -1555,6 +1574,14 @@
 		color: var(--text2);
 	}
 
+	.name-column {
+		white-space: nowrap;
+	}
+
+	.details-column {
+		max-width: 20rem;
+	}
+
 	.name-cell {
 		display: flex;
 		flex-wrap: wrap;
@@ -1565,16 +1592,32 @@
 	.person-name {
 		font-weight: 600;
 		font-size: 1rem;
+		white-space: nowrap;
 	}
 
 	.meta-cell {
 		font-size: 0.875rem;
 		color: var(--text2);
-		line-height: 1.5;
+		line-height: 1.4;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.meta-top-line {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.35rem;
+	}
+
+	.meta-sub-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.8125rem;
+		color: var(--text2);
 	}
 
 	.household-badge {
