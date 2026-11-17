@@ -52,7 +52,7 @@ Use one tested Temporal recurrence utility for all occurrence queries and sortin
 
 The home page is a dashboard, not a calendar. It has concise statistic cards for active Brothers, active people, current-month items, and next-month/next-four-week items. Below that, show a prominent chronological Upcoming Birthdays & Events list covering the administrator-configured number of upcoming weeks; default to 4 weeks.
 
-Each list row must be a horizontal, scannable item: at left a small calendar-sheet block with the day above abbreviated month; at right two lines: person/event title and concise relationship/event context. Examples: “Spouse of Ir∴ Georges Mayrink”, “Daughter of Bro∴ …”, or the event’s related-person context. A regular user can see a public upcoming item but must not get a link that exposes another household’s private detail page. Administrators may see inactive/departed items in a visually distinct administrative section.
+Each list row must be a horizontal, scannable item: at left a small calendar-sheet block with the day above abbreviated month; at right two lines: person/event title and concise relationship/event context. Examples: “Spouse of Ir∴ John Smith”, “Daughter of Bro∴ …”, or the event’s related-person context. A regular user can see a public upcoming item but must not get a link that exposes another household’s private detail page. Administrators may see inactive/departed items in a visually distinct administrative section.
 
 Use a desktop collapsible sidebar. Regular links: Home, My Details, My Family. Admin links: Home, People, Events, Event Types, Users, Lodge/Settings. On mobile, use an accessible drawer/menu with focus management and sensible touch targets.
 

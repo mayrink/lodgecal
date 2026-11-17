@@ -40,10 +40,10 @@ transaction(db, () => {
 	});
 
 	const brotherPerson = insertPerson(db, {
-		fullName: 'Georges Mayrink',
+		fullName: 'John Smith',
 		gender: 'MALE',
 		birthDate: '1982-06-20',
-		email: 'georges@example.com',
+		email: 'john@example.com',
 		phone: null,
 		status: PERSON_STATUS.ACTIVE
 	});
@@ -54,7 +54,7 @@ transaction(db, () => {
 		mustChangePassword: false
 	});
 	const spouse = insertPerson(db, {
-		fullName: 'Helena Mayrink',
+		fullName: 'Mary Smith',
 		gender: 'FEMALE',
 		birthDate: '1984-11-03',
 		email: null,
@@ -81,7 +81,7 @@ transaction(db, () => {
 	const wedding = getEventTypeByKey(db, 'wedding_anniversary');
 	createEvent(db, {
 		eventTypeId: wedding.id,
-		title: 'Mayrink wedding',
+		title: 'Smith wedding',
 		isoDate: '2010-05-20',
 		recurring: true,
 		personIds: [brotherPerson, spouse]
@@ -92,5 +92,5 @@ transaction(db, () => {
 
 console.log('Demo seed complete.');
 console.log('Admin: admin@example.com / ChangeMe-demo-1');
-console.log('User: georges@example.com / ChangeMe-demo-1');
+console.log('User: john@example.com / ChangeMe-demo-1');
 db.close();

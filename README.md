@@ -61,6 +61,17 @@ pnpm dev
 
 Open the printed URL. On first visit you land on `/setup`, where you create the Lodge profile and the initial administrator, who must change their password before continuing.
 
+The administrator you create here is the owner of the installation. After setup, the admin can change their own details under **My profile**, edit any person or household under **People**, and reset any user's password under **Users**. Nothing about the first account is hard-coded.
+
+**Locked out?** Anyone with shell access to the server can reset a password from the command line:
+
+```bash
+pnpm reset-password admin@yourlodge.org            # prints a random temporary password
+pnpm reset-password admin@yourlodge.org 'my-new-passphrase'
+```
+
+The user must choose a new password at next login, existing sessions are ended, and the reset is recorded in the audit log.
+
 Want to explore with sample data first?
 
 ```bash
@@ -70,7 +81,7 @@ pnpm seed
 | Account | Password |
 | --- | --- |
 | `admin@example.com` | `ChangeMe-demo-1` |
-| `georges@example.com` | `ChangeMe-demo-1` |
+| `john@example.com` | `ChangeMe-demo-1` |
 | `leap@example.com` | `ChangeMe-demo-1` (must change on first login) |
 
 The seed is idempotent and skips itself if any user already exists. Never seed a production database.
@@ -105,6 +116,7 @@ The app uses `@sveltejs/adapter-node`. Put it behind a reverse proxy that termin
 | `pnpm preview` | Preview the production build locally. |
 | `pnpm migrate` | Apply database migrations only. |
 | `pnpm seed` | Load demo data into an empty database. |
+| `pnpm reset-password <email>` | Reset a user's password from the command line. |
 | `pnpm test:unit` | Run Vitest unit tests. |
 | `pnpm test:e2e` | Run Playwright end-to-end tests. |
 | `pnpm test` | Run both. |
