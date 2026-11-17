@@ -36,7 +36,7 @@ Most Lodges track birthdays, anniversaries, and Masonic milestones in a spreadsh
 | **Event types** | Seven built-in types plus your own, with a server-enforced rule that milestones never recur. |
 | **Sleeping and departed Brothers** | Retained in the database but hidden from regular users. Admins can see and reinstate them. |
 | **Roles** | `ADMIN` manages everything. `USER` manages only their own household. |
-| **Multilingual UI** | English, Português (Brasil), and Español. |
+| **Multilingual UI** *(in progress)* | English, Português (Brasil), and Español. Translation files are in place; some screens still need their strings moved over. Help welcome. |
 | **Light and dark themes** | Warm "Lodge Ledger" design with accessible focus states, reduced-motion support, and a mobile drawer. |
 | **Audit log** | Logins and material changes are recorded. |
 
