@@ -1,67 +1,115 @@
+<div align="center">
+
 # LodgeCal
 
-Self-hostable Lodge information dashboard for birthdays, household events, and dated personal knowledge. Built with SvelteKit 2 (Svelte 5 runes), plain JavaScript, SQLite, and Temporal civil dates.
+**A self-hosted dashboard for Masonic Lodge birthdays, households, and milestones.**
 
-## Requirements
+Replace the Lodge spreadsheet with one dependable source of truth, and always know what is coming up next.
 
-- Node.js 22+
-- npm 10+
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-2-ff3e00?logo=svelte&logoColor=white)](https://svelte.dev)
+[![Svelte 5](https://img.shields.io/badge/Svelte-5%20runes-ff3e00)](https://svelte.dev)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL-003b57?logo=sqlite&logoColor=white)](https://sqlite.org)
+[![pnpm](https://img.shields.io/badge/pnpm-12-f69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![Plain JavaScript](https://img.shields.io/badge/JavaScript-no%20TypeScript-f7df1e?logo=javascript&logoColor=black)](#stack)
 
-## Local setup
+</div>
 
-```bash
-npm install
-```
+---
 
-Optional environment (see `.env.example`):
+## Why LodgeCal?
 
-```bash
-LODGECAL_DATABASE_PATH=data/lodgecal.sqlite
-ORIGIN=http://localhost:5173
-```
+Most Lodges track birthdays, anniversaries, and Masonic milestones in a spreadsheet that one person maintains and nobody else can trust. LodgeCal is built specifically for that job:
 
-The SQLite file is created outside `static/` on first run. Migrations run automatically when the app starts.
+- **Dashboard first, not a calendar grid.** Open the app and see the next birthdays and events in a configurable window (four weeks by default).
+- **Made for Lodge life.** Initiation, elevation, exaltation, wedding anniversaries, and Lodge anniversaries are first-class, and the first three are structurally non-recurring.
+- **One Lodge, your identity.** Name, number, Obedience, terminology (for example *Bro∴* / *Ir∴*), and accent colors are configuration captured at setup, never hard-coded.
+- **Privacy by design.** Brothers see only what they should. Permissions are enforced on the server, not just by hiding buttons.
+- **Yours to host.** A single Node process and one SQLite file. No SaaS, no third-party services, no tracking.
 
-```bash
-# Apply migrations only
-npm run migrate
+## Features
 
-# Development server
-npm run dev
-```
+| | |
+| --- | --- |
+| **Upcoming dashboard** | Birthdays, anniversaries, and events in a rolling window, with stat cards for the month and the window ahead. |
+| **Households** | Each Brother has one household: an optional spouse and any number of children. Deliberately not a family tree. |
+| **Dated knowledge** | An append-only, dated log of personal context (a new degree, an artistic talent) so greetings are always current. |
+| **Event types** | Seven built-in types plus your own, with a server-enforced rule that milestones never recur. |
+| **Sleeping and departed Brothers** | Retained in the database but hidden from regular users. Admins can see and reinstate them. |
+| **Roles** | `ADMIN` manages everything. `USER` manages only their own household. |
+| **Multilingual UI** | English, Português (Brasil), and Español. |
+| **Light and dark themes** | Warm "Lodge Ledger" design with accessible focus states, reduced-motion support, and a mobile drawer. |
+| **Audit log** | Logins and material changes are recorded. |
 
-On first visit, complete `/setup` to create the Lodge profile and the initial administrator. That administrator must change the password before using the rest of the app.
+### Security
 
-Idempotent demo seed (skips if any user already exists):
+Argon2id password hashing, forced password change on first login, opaque server-side sessions (HttpOnly, SameSite cookies), CSRF protection, failed-login throttling, and server-side authorization in every `load` and `action`.
 
-```bash
-npm run seed
-```
+### Date handling
 
-Demo accounts after seeding:
+Every business date goes through a single [Temporal](https://tc39.es/proposal-temporal/)-based utility (`Temporal.PlainDate`, never `Date`). Birthdays on **Feb 29** are celebrated on **Feb 28** in non-leap years. Ages are computed on display and never stored.
 
-- `admin@example.com` / `ChangeMe-demo-1`
-- `georges@example.com` / `ChangeMe-demo-1`
-- `leap@example.com` / `ChangeMe-demo-1` (must change password)
+## Quick start
 
-## Tests
-
-```bash
-npm run test:unit
-npx playwright install --with-deps
-npm run test:e2e
-```
-
-Focused coverage includes Temporal birthday/recurrence (Feb 29 → Feb 28), permission boundaries, forced temporary-password change, and server refusal of recurring initiation/elevation/exaltation.
-
-## Production build
+**Requirements:** Node.js 22 or newer and [pnpm](https://pnpm.io) 12.
 
 ```bash
-npm run build
-ORIGIN=http://localhost:3000 node build
+git clone <your-repo-url> lodgecal
+cd lodgecal
+pnpm install
+pnpm dev
 ```
 
-Uses `@sveltejs/adapter-node`. Keep `data/*.sqlite` and secrets off the public static path. Set `ORIGIN` to the public URL.
+Open the printed URL. On first visit you land on `/setup`, where you create the Lodge profile and the initial administrator, who must change their password before continuing.
+
+Want to explore with sample data first?
+
+```bash
+pnpm seed
+```
+
+| Account | Password |
+| --- | --- |
+| `admin@example.com` | `ChangeMe-demo-1` |
+| `georges@example.com` | `ChangeMe-demo-1` |
+| `leap@example.com` | `ChangeMe-demo-1` (must change on first login) |
+
+The seed is idempotent and skips itself if any user already exists. Never seed a production database.
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LODGECAL_DATABASE_PATH` | `data/lodgecal.sqlite` | Location of the SQLite file. |
+| `ORIGIN` | `http://localhost:5173` | Public URL of the app. Required in production for CSRF checks. |
+
+The database is created on first run and migrations in `migrations/` are applied automatically at startup. To apply them without starting the app, run `pnpm migrate`.
+
+## Production
+
+```bash
+pnpm build
+ORIGIN=https://lodge.example.org node build
+```
+
+The app uses `@sveltejs/adapter-node`. Put it behind a reverse proxy that terminates TLS, set `ORIGIN` to the public URL, and back up the `data/` directory (the `.sqlite` file and its `-wal` / `-shm` companions) regularly.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Start the development server. |
+| `pnpm build` | Build the production bundle. |
+| `pnpm start` | Run the production build (`node build`). |
+| `pnpm preview` | Preview the production build locally. |
+| `pnpm migrate` | Apply database migrations only. |
+| `pnpm seed` | Load demo data into an empty database. |
+| `pnpm test:unit` | Run Vitest unit tests. |
+| `pnpm test:e2e` | Run Playwright end-to-end tests. |
+| `pnpm test` | Run both. |
+
+For the first end-to-end run, install the browsers with `pnpm exec playwright install --with-deps`.
 
 ## Stack
 
@@ -74,14 +122,44 @@ Uses `@sveltejs/adapter-node`. Keep `data/*.sqlite` and secrets off the public s
 | `argon2` | Argon2id password hashing |
 | `@js-temporal/polyfill` | Temporal civil dates |
 | `vitest` | Unit tests |
-| `@playwright/test` | End-to-end smoke tests |
-| `vite` | Dev/build |
+| `@playwright/test` | End-to-end tests |
+| `vite` | Dev server and bundler |
 
-No TypeScript application source, Tailwind, or component kits.
+Application code is plain JavaScript (`.js` and `.svelte`) with plain CSS and custom properties. There is no TypeScript, Tailwind, or component kit, by design.
 
-## Roles
+## Project layout
 
-- **USER**: dashboard, own Person record, own spouse/children, household dated knowledge.
-- **ADMIN**: people, households, events, event types, users, Lodge settings, inactive/departed records.
+```
+src/
+  lib/            shared code: dates, i18n, constants, components, locales
+  lib/server/     database, auth, sessions, CSRF, audit, repositories
+  routes/         pages and server actions (admin, brothers, events, family, me, people, settings, users, ...)
+migrations/       ordered SQL migrations
+scripts/          migrate and seed scripts
+e2e/              Playwright tests
+documentation/    codebase notes
+```
 
-Permissions are enforced in server `load`/`actions` and `hooks.server.js`, not only by hiding navigation.
+See [`PRODUCT.md`](PRODUCT.md) for product intent and constraints, and [`DESIGN.md`](DESIGN.md) for the design system.
+
+## Contributing
+
+Contributions are welcome: bug reports, translations, and pull requests. Before opening a pull request:
+
+1. Run `pnpm test` and make sure it passes.
+2. Keep to the stack rules above (plain JavaScript, Svelte 5 runes, Temporal for dates).
+3. Never commit real Lodge data, secrets, or database files. `data/*.sqlite*` and `.env` are git-ignored for a reason.
+
+## License
+
+LodgeCal is free software under the [GNU Affero General Public License v3.0 or later](LICENSE), with additional attribution terms described in [`NOTICE.md`](NOTICE.md).
+
+In short:
+
+- You may use, study, modify, and share it, including offering it as a hosted service.
+- You must **credit the original project and author** and keep the copyright notices.
+- If you distribute a modified version, or run one for others over a network, you must publish your **complete source code under the same license**. It cannot be closed-source.
+- Improvements are very welcome as pull requests.
+- Need different terms, such as embedding it in a proprietary product? A **commercial license** is available. See [`NOTICE.md`](NOTICE.md).
+
+Copyright &copy; 2026 Georges Mayrink.

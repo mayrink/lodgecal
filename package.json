@@ -1,6 +1,8 @@
 {
 	"name": "lodgecal",
 	"private": true,
+	"license": "AGPL-3.0-or-later",
+	"author": "Georges Mayrink",
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
@@ -13,7 +15,7 @@
 		"seed": "node scripts/seed.js",
 		"test:unit": "vitest run",
 		"test:watch": "vitest",
-		"test": "npm run test:unit && npm run test:e2e",
+		"test": "pnpm test:unit && pnpm test:e2e",
 		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
